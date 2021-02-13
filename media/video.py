@@ -26,11 +26,11 @@ class Video():
             if "temp_stream" in self.playback:
                 l = self.playback["temp_stream"]
             else:
-                f = Filter.Graph()
+                #f = Filter.Graph()
                 #f.add_buffer(template=self._ffmpeg.streams.video[streamN])
                 #f.add("pad",":".join([str(self.playback["v_dispWidth"]),str(self.playback["v_dispHeight"])]))
                 #f.add("buffersink")
-                f.configure()
+                #f.configure()
                 l = self._ffmpeg.av.decode(video=streamN)
                 self.playback["temp_stream"]=l
             if sleep_time*point >= self.playback["v_time"]:
