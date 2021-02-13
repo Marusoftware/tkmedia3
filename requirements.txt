@@ -1,5 +1,0 @@
-numpy
-Pillow
-imageio
-sounddevice
-pydub

@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "tkmedia"
+version = "0.0.1"
+authors = [
+    "Marusoftware <marusoftware@outlook.jp>"
+]
+description = "tkinter media support."
+
+packages = [
+    { include="media", from="."}
+]
+
+[tool.poetry.dependencies]
+python = "^3.5"
+av = "^8.0.3"
+pylint = "^2.6.0"
+Pillow = "^8.1.0"
+
+[build-system]
+requires = ["poetry_core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
