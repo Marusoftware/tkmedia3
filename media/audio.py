@@ -40,7 +40,11 @@ class Audio():#TODO: Stop, Change
                         self.finished=True
                 else:
                     self.finished=False
-                    if self.fifo.samples <= tmp_frame.samples*5:#TODO: sync!
+                    if tmp_frame.index*tmp_frame.samples < tmp_frame.samples*5:
+                        border = tmp_frame.index*tmp_frame.samples
+                    else:
+                        border = tmp_frame.samples*5
+                    if self.fifo.samples <= border:#TODO: sync!
                         if self.soundStream.active:
                             self.soundStream.abort()
                         if self.playback["syncV"] != None and vstate == "play":
