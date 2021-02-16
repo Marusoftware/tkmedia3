@@ -39,19 +39,21 @@ class Video():
                 try:
                     self.playback["temp_image"].close()
                     self.playback["temp_image2"].close()
-                    #self.playback.pop("temp_image")
                 except:
                     pass
             try:
-                #tmp_frame=next(l).reformat(width=self.playback["v_dispWidth"],height=self.playback["v_dispHeight"])
-                tmp_frame=next(l)
+                if self.playback["v_resize"] == "zoom":
+                    tmp_frame=next(l).reformat(width=self.playback["v_dispWidth"],height=self.playback["v_dispHeight"])
+                else:
+                    tmp_frame=next(l)
             except StopIteration:
-                self.playback["state"]="stop"
-                self.playback["v_Frame"].after(0, self._Show)
+                if tmp_frame.index==vid_info["frame_count"]:
+                    self.playback["state"]="pause"
+                    self.playback["v_Frame"].after(0, self._Show)
             else:
                 if sleep_time*tmp_frame.index >= self.watch.getTime():
                     self.playback["temp_image"]=tmp_frame.to_image()
-                    if self.playback["v_resize"]:
+                    if self.playback["v_resize"] == "aspect":
                         self.playback["temp_image"].thumbnail((self.playback["v_dispWidth"], self.playback["v_dispHeight"]))
                         self.playback["temp_image2"] = Image.new("RGBA",[self.playback["v_dispWidth"],self.playback["v_dispHeight"]],(0,0,0,255))
                         self.playback["temp_image2"].paste(self.playback["temp_image"],(int((self.playback["v_dispWidth"]-self.playback["temp_image"].size[0])/2),int((self.playback["v_dispHeight"]-self.playback["temp_image"].size[1])/2)))
@@ -63,7 +65,6 @@ class Video():
                     self.playback["v_Frame"].after(int(sleep_time*1000), self._Show)
                 else:
                     self.playback["v_Frame"].after(0, self._Show)
-            #self.playback["v_time"]+=(time.time()-t1)
             return
         elif state == "reload":
             self.watch.stop()
@@ -73,10 +74,14 @@ class Video():
             self.watch.stop()
             self.watch.clear()
             return
+        elif state == "waita":
+            self.watch.stop()
+            self.playback["v_Frame"].after(int(sleep_time*1000), self._Show)
+            return
         else:
             self.playback.update(state="pause")
         self.playback["v_Frame"].after(0, self._Show)
-    def Show(self, frame, streamN=0, start_point=0, speed=1, frameType="frame", thread_type="AUTO", height=600, width=600, resize=True):
+    def Show(self, frame, streamN=0, start_point=0, speed=1, frameType="frame", thread_type="AUTO", height=600, width=600, resize="aspect"):
         self.playback["v_streamN"] = streamN
         self.playback["v_Frame"] = frame
         self.playback["v_FrameType"] = frameType
@@ -85,9 +90,9 @@ class Video():
         self.playback["v_resize"] = resize
         self.playback["v_speed"] = speed
         self._ffmpeg.streams.video[streamN].thread_type=thread_type
-        frame.after(0, self._Show)
-        self.watch.start()
         self.playback["state"] = "play"
+        self.playback["v_Frame"].after(0, self._Show)
+        self.watch.start()
     def Stop(self):
         self.playback["state"] = "stop"
     def Change(self, key, value=None):

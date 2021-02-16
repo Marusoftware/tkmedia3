@@ -11,20 +11,19 @@ class Audio():#TODO: Stop, Change
             raise MediaFileError("This File doesn't contain audio.")
         self.playback["state"]="stop"
         self.fifo=AudioFifo()
-        self.finished=False
+        self.buffer=queue.Queue()
     def _Play(self):#TODO:speed, sounddevice_param, stop, reload(no sync??), bug fix
         #try: 
         while 1:
             if self.playback["syncV"] != None:
                 vplayback = self.playback["syncV"].playback
-                vstate=vplayback["state"]
+                state=vplayback["state"]
             else:
-                vstate="disable"
-            state=self.playback["state"]
+                state=self.playback["state"]
             streamN = self.playback["a_streamN"]
             aud_info = self.file_info["streams"]["audio"][streamN]
-            if state == "pause" or vstate=="pause":
-                if self.soundStream.active:
+            if state == "pause":
+                if not self.soundStream.active:
                     self.soundStream.abort()
             elif state == "play":
                 if "temp_stream" in self.playback:
@@ -35,26 +34,9 @@ class Audio():#TODO: Stop, Change
                 try:
                     tmp_frame=next(l)
                 except StopIteration:
-                    if aud_info["frame_count"] == tmp_frame.index*tmp_frame.samples:
-                        self.soundStream.abort()
-                        self.finished=True
+                    pass
                 else:
-                    self.finished=False
-                    if self.fifo.samples <= tmp_frame.samples*5:#TODO: sync!
-                        if self.soundStream.active:
-                            self.soundStream.abort()
-                        if self.playback["syncV"] != None and vstate == "play":
-                            self.playback["syncV"].playback["state"] = "waita"
-                    else:
-                        if not self.soundStream.active:
-                            self.soundStream.start()
-                        if self.playback["syncV"] != None and vstate == "waita":
-                            self.playback["syncV"].playback["state"] = "play"
                     self.fifo.write(tmp_frame)
-            elif state == "stop" or vstate=="stop":
-                if self.soundStream.active:
-                    self.soundStream.abort()
-                break
             time.sleep(1/1000)
     def _Play_callback(self, outdata, frames, time, status):
         if self.fifo.samples_written:
@@ -70,19 +52,11 @@ class Audio():#TODO: Stop, Change
         aud_info = self.file_info["streams"]["audio"][streamN]
         self._ffmpeg.streams.audio[streamN].thread_type=thread_type
         self.thread = threading.Thread(target=self._Play)
-        self.soundStream = sounddevice.OutputStream(channels=aud_info["channel"], dtype="float32", samplerate=aud_info["sample_rate"],
-        callback=self._Play_callback, prime_output_buffers_using_stream_callback=True, blocksize=aud_info["frame_size"])
+        self.soundStream = sounddevice.OutputStream(channels=aud_info["channel"], dtype="float32", samplerate=aud_info["sample_rate"], callback=self._Play_callback,blocksize=1024,prime_output_buffers_using_stream_callback=True)
         self.thread.start()
-    def Stop(self):
-        self.playback["state"] = "stop"
-    def Change(self, key, value=None):
-        if key == "stream":
-            self.v_streamN = int(value)
-            self.Change("clr_cache")
-        elif key == "state":
-            self.state = value
-        elif key == "clr_cache":
-            self.playback.pop("temp_stream")
+        self.soundStream.start()
+        #if syncV == None:
+        #self.soundStream.start()
 
 """ class Video():
     def _Show(self):

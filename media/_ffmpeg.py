@@ -28,7 +28,7 @@ class _FFMPEG():
                         "frame_count":st.frames, "bit_rate":codec.bit_rate, "codec_name":codec.name, "codec_long":codec.codec.long_name,
                         "delay":codec.codec.delay, "time_base":st.time_base}
                         if st.type == "audio":
-                            o.update(channel=codec.channels, channel_name=codec.layout.name, sample_rate=st.sample_rate)
+                            o.update(channel=codec.channels, channel_name=codec.layout.name, sample_rate=st.sample_rate, frame_size=st.frame_size)
                         elif st.type == "video":
                             o.update(height=codec.height,width=codec.width, fps=st.base_rate, aspect_ratio=codec.sample_aspect_ratio)
                         return o
