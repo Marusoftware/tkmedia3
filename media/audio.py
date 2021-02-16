@@ -10,10 +10,10 @@ class Audio():#TODO: Stop, Change
         if len(self.file_info["streams"]["audio"]) == 0:
             raise MediaFileError("This File doesn't contain audio.")
         self.playback["state"]="stop"
+        self.playback["Now"]={"time":0,"index":0}
         self.fifo=AudioFifo()
         self.finished=False
     def _Play(self):#TODO:speed, sounddevice_param, stop, reload(no sync??), bug fix
-        #try: 
         while 1:
             if self.playback["syncV"] != None:
                 vplayback = self.playback["syncV"].playback
@@ -35,10 +35,9 @@ class Audio():#TODO: Stop, Change
                 try:
                     tmp_frame=next(l)
                 except StopIteration:
-                    if aud_info["frame_count"] == tmp_frame.index*tmp_frame.samples:
-                        self.soundStream.abort()
-                        self.finished=True
+                    pass
                 else:
+                    self.playback["Now"]["index"]=tmp_frame.index
                     self.finished=False
                     if tmp_frame.index*tmp_frame.samples < tmp_frame.samples*5:
                         border = tmp_frame.index*tmp_frame.samples
@@ -61,8 +60,19 @@ class Audio():#TODO: Stop, Change
                 break
             time.sleep(1/1000)
     def _Play_callback(self, outdata, frames, time, status):
+        aud_info = self.file_info["streams"]["audio"][self.playback["a_streamN"]]
         if self.fifo.samples_written:
-            outdata[:] = numpy.rot90(self.fifo.read(len(outdata)).to_ndarray(),-1).copy(order="C")
+            data = self.fifo.read(len(outdata))
+            if data == None:
+                if aud_info["frame_count"] == self.playback["Now"]["index"]:
+                    self.soundStream.abort()
+                    self.finished=True
+                else:
+                    print("oh no...")
+                    raise sounddevice.CallbackAbort
+            else:
+                self.playback["Now"]["time"]+=self.fifo.pts_per_sample
+                outdata[:] = numpy.rot90(data.to_ndarray(),-1).copy(order="C")
         else:
             print("oh no...")
             raise sounddevice.CallbackAbort

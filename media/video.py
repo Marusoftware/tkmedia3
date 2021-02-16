@@ -13,6 +13,8 @@ class Video():
             raise MediaFileError("This File doesn't contain video.")
         self.playback["state"]="stop"
         self.watch = StopWatch(error=False)
+        self.playback["Now"]={"time":0,"index":0}
+        self.finished=False
     def _Show(self):
         state=self.playback["state"]
         streamN = self.playback["v_streamN"]
@@ -47,10 +49,14 @@ class Video():
                 else:
                     tmp_frame=next(l)
             except StopIteration:
-                if tmp_frame.index==vid_info["frame_count"]:
+                if self.playback["Now"]["index"]==vid_info["frame_count"]:
                     self.playback["state"]="pause"
                     self.playback["v_Frame"].after(0, self._Show)
+                    self.finished=True
             else:
+                self.finished=False
+                self.playback["Now"]["index"]=tmp_frame.index
+                self.playback["Now"]["time"]=sleep_time*tmp_frame.index
                 if sleep_time*tmp_frame.index >= self.watch.getTime():
                     self.playback["temp_image"]=tmp_frame.to_image()
                     if self.playback["v_resize"] == "aspect":

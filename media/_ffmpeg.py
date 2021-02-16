@@ -43,3 +43,4 @@ class _FFMPEG():
         elif mode == "rw" or mode == "w":
             self.ADD=self.av.add_stream
         self.CLOSE = self.av.close
+        self.SEEK = self.av.seek

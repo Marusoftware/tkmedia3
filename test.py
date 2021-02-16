@@ -3,20 +3,60 @@ url="https://marusoftware.ddns.net/service/video/dA6rdGC9slWBThQ.mp4"
 #url="/home/maruo/ビデオ/test.mp4"
 
 def chg_state():
-    if a.playback["state"] == "pause":
-        a.playback["state"] == "play"
-        b.playback["state"] == "play"
+    if v.playback["state"] == "pause":
+        if en["Video"]:
+            v.playback["state"] = "play"
+            if v.finished: m.Seek(0)
+        if en["Audio"]:
+            a.playback["state"] = "play"
+            if a.finished: m2.Seek(0)
+        root.bt1.configure(text="Pause")
     else:
-        a.playback["state"] == "pause"
+        if en["Video"]:
+            v.playback["state"] = "pause"
+        if en["Audio"]:
+            a.playback["state"] = "pause"
+        root.bt1.configure(text="Play")
+def finish():
+    if en["Video"]:
+        v.Stop()
+    if en["Audio"]:
+        a.Stop()
+    root.destroy()
 
 root = tkinter.Tk()
 root.f = tkinter.Label(root)
 root.f.pack(fill="both", expand=True)
-root.bt1 = tkinter.Button(root, text="Stop", command=chg_state)
-a = media.Media(url)
-b = media.Video(a)
-a2 = media.Media(url)
-c = media.Audio(a2)
-b.Show(root.f, height=600, width=600, resize="aspect")
-c.Play(syncV=b)
-root.mainloop()
+root.bt1 = tkinter.Button(root, text="Pause", command=chg_state)
+root.bt1.pack()
+root.bt2 = tkinter.Button(root, text="Exit", command=finish)
+root.bt2.pack()
+m = media.Media(url)
+en = {"Video":None,"Audio":None}
+try:
+    v = media.Video(m)
+except media.MediaFileError:
+    en["Video"]=False
+else:
+    en["Video"]=True
+print("Video:",en["Video"])
+m2 = media.Media(url)
+try:
+    a = media.Audio(m2)
+except:
+    en["Audio"]=False
+else:
+    en["Audio"]=True
+print("Audio:",en["Audio"])
+if en["Video"]:v.Show(root.f, height=600, width=600, resize="aspect")
+if en["Audio"]:
+    if en["Video"]:
+        a.Play(syncV=v)
+    else:
+        a.Play()
+try:
+    root.mainloop()
+except KeyboardInterrupt:
+    v.Stop()
+    a.Stop()
+    root.destroy()
