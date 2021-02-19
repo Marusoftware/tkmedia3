@@ -1,9 +1,9 @@
-import media, tkinter, time
-url="https://marusoftware.ddns.net/service/video/dA6rdGC9slWBThQ.mp4"
-#url="/home/maruo/ビデオ/test.mp4"
+import media, tkinter, time, pprint#, tkinter.filedialog
+from media.lib import askopenfilename
+#url="https://marusoftware.ddns.net/service/video/dA6rdGC9slWBThQ.mp4"
 
 def chg_state():
-    if v.playback["state"] == "pause":
+    if (en["Video"] and v.playback["state"] == "pause") or (en["Audio"] and a.playback["state"] == "pause"):
         if en["Video"]:
             v.playback["state"] = "play"
             if v.finished: m.Seek(0)
@@ -24,13 +24,23 @@ def finish():
         a.Stop()
     root.destroy()
 
+def seek():
+    point=int(root.e.get())
+    if en["Video"]: m.Seek(point)
+    if en["Audio"]: m2.Seek(point)
+
 root = tkinter.Tk()
+url=askopenfilename()
 root.f = tkinter.Label(root)
 root.f.pack(fill="both", expand=True)
 root.bt1 = tkinter.Button(root, text="Pause", command=chg_state)
 root.bt1.pack()
 root.bt2 = tkinter.Button(root, text="Exit", command=finish)
 root.bt2.pack()
+root.e = tkinter.Entry(root)
+root.e.pack()
+root.bt3 = tkinter.Button(root, text="Seek", command=seek)
+root.bt3.pack()
 m = media.Media(url)
 en = {"Video":None,"Audio":None}
 try:
@@ -48,7 +58,8 @@ except:
 else:
     en["Audio"]=True
 print("Audio:",en["Audio"])
-if en["Video"]:v.Show(root.f, height=600, width=600, resize="aspect")
+pprint.pprint(m.info)
+if en["Video"]:v.Show(root.f, height=900, width=1920, resize="aspect")
 if en["Audio"]:
     if en["Video"]:
         a.Play(syncV=v)

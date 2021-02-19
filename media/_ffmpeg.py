@@ -1,6 +1,7 @@
 import av
 from av import codec, filter
 from  av.audio.fifo import AudioFifo 
+import av.datasets
 
 Filter = filter
 
@@ -8,7 +9,7 @@ class _FFMPEG():
     def __init__(self):
         self.av = None
     def OPEN(self, path, mode="r", avformat="autodetect"):
-        self.av = av.open(path, mode=mode, format=avformat)
+        self.av = av.open(av.datasets.curated(path), mode=mode, format=avformat)
         self.info = {
             "codec_name" : self.av.format.name.split(","),
             "codec_long" : self.av.format.long_name,
@@ -28,7 +29,7 @@ class _FFMPEG():
                         "frame_count":st.frames, "bit_rate":codec.bit_rate, "codec_name":codec.name, "codec_long":codec.codec.long_name,
                         "delay":codec.codec.delay, "time_base":st.time_base}
                         if st.type == "audio":
-                            o.update(channel=codec.channels, channel_name=codec.layout.name, sample_rate=st.sample_rate, frame_size=st.frame_size)
+                            o.update(channel=codec.channels, channel_name=codec.layout.name, sample_rate=st.sample_rate, frame_size=codec.frame_size)
                         elif st.type == "video":
                             o.update(height=codec.height,width=codec.width, fps=st.base_rate, aspect_ratio=codec.sample_aspect_ratio)
                         return o

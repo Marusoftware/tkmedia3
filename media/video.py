@@ -49,7 +49,7 @@ class Video():
                 else:
                     tmp_frame=next(l)
             except StopIteration:
-                if self.playback["Now"]["index"]==vid_info["frame_count"]:
+                if self.playback["Now"]["index"]==vid_info["frame_count"] and vid_info["frame_count"] != 0:
                     self.playback["state"]="pause"
                     self.playback["v_Frame"].after(0, self._Show)
                     self.finished=True
@@ -60,7 +60,7 @@ class Video():
                 if sleep_time*tmp_frame.index >= self.watch.getTime():
                     self.playback["temp_image"]=tmp_frame.to_image()
                     if self.playback["v_resize"] == "aspect":
-                        self.playback["temp_image"].thumbnail((self.playback["v_dispWidth"], self.playback["v_dispHeight"]))
+                        self.playback["temp_image"].thumbnail((self.playback["v_dispWidth"], self.playback["v_dispHeight"]), Image.ANTIALIAS)
                         self.playback["temp_image2"] = Image.new("RGBA",[self.playback["v_dispWidth"],self.playback["v_dispHeight"]],(0,0,0,255))
                         self.playback["temp_image2"].paste(self.playback["temp_image"],(int((self.playback["v_dispWidth"]-self.playback["temp_image"].size[0])/2),int((self.playback["v_dispHeight"]-self.playback["temp_image"].size[1])/2)))
                         self.playback["temp_imageTk"] = ImageTk.PhotoImage(self.playback["temp_image2"], master=self.playback["v_Frame"])
@@ -82,7 +82,7 @@ class Video():
             return
         elif state == "waita":
             self.watch.stop()
-            self.playback["v_Frame"].after(int(sleep_time*1000), self._Show)
+            self.playback["v_Frame"].after(0, self._Show)
             return
         else:
             self.playback.update(state="pause")

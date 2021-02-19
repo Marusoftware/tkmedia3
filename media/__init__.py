@@ -8,5 +8,7 @@ class Media:
     def __init__(self, url, mode="r", avformat=None):#TODO:書き直し
         self.stream = _ffmpeg._FFMPEG()
         self.stream.OPEN(url, mode, avformat)
-    def Seek(p):
+        self.info=self.stream.info
+        self.streams=self.stream.streams
+    def Seek(self, p):
         self.stream.SEEK(p)
