@@ -37,6 +37,9 @@ class StopWatch():
             return self.time
         else:
             return self.time+(time.time()-self.start_time)
+    def setTime(self, t):
+        if self.isStop:
+            self.time = t
 
 #default setting
 if platform.system() == "Linux":

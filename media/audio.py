@@ -46,7 +46,6 @@ class Audio():#TODO: Stop, Change
                         self.finished=False
                         if aud_info["frame_size"] != array.shape[1]:
                             print("Oh, no. wrong stream frame_size!!restarting frame...")
-                            #self.soundStream.abort()
                             if self.playback["Now"]["load_index"] - self.playback["Now"]["index"] != 0:
                                 while self.playback["state"] == "play" and self.playback["Now"]["load_index"] - self.playback["Now"]["index"] > 0:sounddevice.sleep(2)
                             self.soundStream.stop()
@@ -59,13 +58,10 @@ class Audio():#TODO: Stop, Change
                             else:
                                 self.playback["state"]="pause"
                         if aud_info["frame_count"]-tmp_frame.index <= 5:
-                            #border = (aud_info["frame_count"]-tmp_frame.index)*tmp_frame.samples
                             border=aud_info["frame_count"]-tmp_frame.index
                         else:
-                            #border = tmp_frame.samples*5
                             border=5
-                        #if self.fifo.samples < border:#TODO: sync!
-                        if self.fifo.qsize() < border:
+                        if self.fifo.qsize() < border:#TODO: sync!
                             if not self.soundStream.stopped:
                                 self.soundStream.abort()
                                 print("a")
@@ -77,16 +73,15 @@ class Audio():#TODO: Stop, Change
                                 print("s")
                             if self.playback["syncV"] != None and vstate == "waita":
                                 self.playback["syncV"].playback["state"] = "play"
-                        #print(tmp_frame)
-                        #self.fifo.write(tmp_frame)
                         self.fifo.put(numpy.rot90(array,-1).copy(order="C"))
-                        #print("p")
+                else:
+                    if self.soundStream.stopped:
+                        self.soundStream.start()
             elif state == "stop" or vstate=="stop":
                 if self.soundStream.active:
                     self.soundStream.abort()
                 break
             sounddevice.sleep(2)
-            #time.sleep(1/1000)
     def _Play_callback(self, outdata, frames, time, status):
         astate = self.playback["state"]
         if self.playback["syncV"] == None:
