@@ -29,12 +29,12 @@ class Video():
             if "temp_stream" in self.playback:
                 l = self.playback["temp_stream"]
             else:
-                #f = Filter.Graph()
-                #f.add_buffer(template=self._ffmpeg.streams.video[streamN])
-                #f.add("pad",":".join([str(self.playback["v_dispWidth"]),str(self.playback["v_dispHeight"])]))
-                #f.add("buffersink")
-                #f.configure()
-                l = self._ffmpeg.av.decode(video=streamN)
+            #     f = Filter.Graph()
+            #     #f.add_buffer(template=self._ffmpeg.streams.video[streamN])
+            #     #f.add("pad",":".join([str(self.playback["v_dispWidth"]),str(self.playback["v_dispHeight"])]))
+            #     #f.add("buffersink")
+            #     #f.configure()
+                l = self._ffmpeg.av.decode(self._ffmpeg.streams.get(video=0)[0])
                 self.playback["temp_stream"]=l
             
             if "temp_image" in self.playback:
@@ -45,9 +45,13 @@ class Video():
                     pass
             try:
                 if self.playback["v_resize"] == "zoom":
-                    tmp_frame=next(l).reformat(width=self.playback["v_dispWidth"],height=self.playback["v_dispHeight"])
+                    _tmp_frame=next(l).reformat(width=self.playback["v_dispWidth"],height=self.playback["v_dispHeight"])
+                    #tmp_frame=next(l).reformat(width=self.playback["v_dispWidth"],height=self.playback["v_dispHeight"])
                 else:
-                    tmp_frame=next(l)
+                    _tmp_frame=next(l)
+                    #tmp_frame=next(l)
+                self.filter.push(_tmp_frame)
+                tmp_frame=self.filter.pull()
             except StopIteration:
                 if self.playback["Now"]["index"]==vid_info["frame_count"] and vid_info["frame_count"] != 0:
                     self.playback["state"]="pause"
@@ -57,7 +61,7 @@ class Video():
                 self.finished=False
                 self.playback["Now"]["index"]=tmp_frame.index
                 self.playback["Now"]["time"]=sleep_time*tmp_frame.index
-                if sleep_time*tmp_frame.index >= self.watch.getTime():
+                if sleep_time*_tmp_frame.index >= self.watch.getTime():
                     self.playback["temp_image"]=tmp_frame.to_image()
                     if self.playback["v_resize"] == "aspect":
                         self.playback["temp_image"].thumbnail((self.playback["v_dispWidth"], self.playback["v_dispHeight"]), Image.ANTIALIAS)
@@ -97,6 +101,13 @@ class Video():
         self.playback["v_speed"] = speed
         self._ffmpeg.streams.video[streamN].thread_type=thread_type
         self.playback["state"] = "play"
+        self.filter = Filter.Graph()
+        self.filter_src = self.filter.add_buffer(template=self._ffmpeg.streams.video[streamN])
+        if resize == "aspect":
+            pad=self.filter.add("pad", "height="+str(height)+":width="+str(width)+":y="+str(height/2)+":x="+str(width/2)+":eval=frame")
+            self.filter_src.link_to(pad)
+            pad.link_to(self.filter.add("buffersink"))
+        self.filter.configure()
         self.playback["v_Frame"].after(0, self._Show)
         self.watch.start()
     def Stop(self):

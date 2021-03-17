@@ -13,6 +13,7 @@ class Audio():#TODO: Stop, Change
         self.playback["Now"]={"load_index":0,"index":0}
         self.fifo=queue.SimpleQueue()
         self.finished=False
+        self.sStream_closed = True
     def _Play(self):#TODO:speed, sounddevice_param, stop, reload(no sync??), bug fix
         while 1:
             if self.playback["syncV"] != None:
@@ -24,10 +25,10 @@ class Audio():#TODO: Stop, Change
             streamN = self.playback["a_streamN"]
             aud_info = self.file_info["streams"]["audio"][streamN]
             if vstate == "pause":
-                if not self.playback["syncV"] and not self.soundStream.closed:
+                if not self.playback["syncV"] and not self.sStream_closed:
                     self.soundStream.abort()
             if state == "pause":
-                if not self.soundStream.closed:
+                if not self.sStream_closed:
                     self.soundStream.abort()
             elif state == "play":
                 if abs(self.playback["Now"]["load_index"] - self.playback["Now"]["index"]) <= 1000:
@@ -42,7 +43,6 @@ class Audio():#TODO: Stop, Change
                         pass
                     else:
                         array=tmp_frame.to_ndarray()
-                        self.playback["Now"]["load_index"]=tmp_frame.index
                         self.finished=False
                         if aud_info["frame_size"] != array.shape[1]:
                             print("Oh, no. wrong stream frame_size!!restarting frame...")
@@ -64,7 +64,6 @@ class Audio():#TODO: Stop, Change
                         if self.fifo.qsize() < border:#TODO: sync!
                             if not self.soundStream.stopped:
                                 self.soundStream.abort()
-                                print("a")
                             if self.playback["syncV"] != None and vstate == "play":
                                 self.playback["syncV"].playback["state"] = "waita"
                         else:
@@ -74,11 +73,12 @@ class Audio():#TODO: Stop, Change
                             if self.playback["syncV"] != None and vstate == "waita":
                                 self.playback["syncV"].playback["state"] = "play"
                         self.fifo.put(numpy.rot90(array,-1).copy(order="C"))
+                        self.playback["Now"]["load_index"]=tmp_frame.index
                 else:
                     if self.soundStream.stopped:
                         self.soundStream.start()
             elif state == "stop" or vstate=="stop":
-                if self.soundStream.active:
+                if not self.sStream_closed:
                     self.soundStream.abort()
                 break
             sounddevice.sleep(2)
@@ -90,29 +90,34 @@ class Audio():#TODO: Stop, Change
             vstate = self.playback["syncV"].playback["state"]
         aud_info = self.file_info["streams"]["audio"][self.playback["a_streamN"]]
         if astate == "play":
-            try:
-                data = self.fifo.get_nowait()
-            except queue.Empty:
-                if aud_info["frame_count"] == self.playback["Now"]["index"]:
-                    if aud_info["frame_count"] == 0:
-                        #print("em")
-                        pass
-                    else:
-                        self.finished=True
-                        #print("f")
-                        raise sounddevice.CallbackStop
-                else:
-                    #print("em")
-                    pass
-                    #raise sounddevice.CallbackAbort
+            if aud_info["frame_count"]-self.playback["Now"]["load_index"] <= 5:
+                border=aud_info["frame_count"]-self.playback["Now"]["load_index"].index
             else:
-                if len(data) != len(outdata): raise sounddevice.CallbackAbort
-                outdata[:] = data
-                self.playback["Now"]["index"]+=1
-                #print("w")
-                #self.playback["Now"]["time"]+=1
+                border=5
+            if self.fifo.qsize() < border:
+                self.sStream_closed=True
+                raise sounddevice.CallbackStop
+            else:
+                try:
+                    data = self.fifo.get_nowait()
+                except queue.Empty:
+                    if aud_info["frame_count"] == self.playback["Now"]["index"]:
+                        if aud_info["frame_count"] == 0:
+                            pass
+                        else:
+                            self.finished=True
+                            self.sStream_closed=True
+                            raise sounddevice.CallbackStop
+                    else:
+                        pass
+                        #raise sounddevice.CallbackAbort
+                else:
+                    self.sStream_closed=False
+                    if len(data) != len(outdata): raise sounddevice.CallbackAbort
+                    outdata[:] = data
+                    self.playback["Now"]["index"]+=1
         else:
-            print("oh no...")
+            pass#TODO: other state
     def Play(self, streamN=0, syncV=None, speed=1, thread_type="AUTO"):
         self.playback["a_streamN"] = streamN
         self.playback["syncV"] = syncV

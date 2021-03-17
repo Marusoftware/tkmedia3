@@ -65,7 +65,10 @@ def askopenfilename(fd=None, **argv):
         else:
             return _fd1.askopenfilename(**argv)
     elif fd:
-        return _fd2.askopenfilename(**argv)
+        try:
+            return _fd2.askopenfilename(**argv)
+        except:
+            return _fd1.askopenfilename(**argv)
     else:
         return _fd1.askopenfilename(**argv)
 def askopenfilenames(fd=None, **argv):
