@@ -68,8 +68,8 @@ class FFMPEG():
             pass
         #self.CLOSE = self.av.close
         #self.SEEK = self.av.seek
-    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.SimpleQueue(), Vqueue=queue.SimpleQueue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None):
-        self.loadinfo={"AstreamN":audio, "VstreamN":video, "border":border}
+    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.SimpleQueue(), Vqueue=queue.SimpleQueue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None, queueMax=300):
+        self.loadinfo={"AstreamN":audio, "VstreamN":video, "border":border, "queueMax":queueMax}
         mux_source=[]
         if not audio is None:
             if len(self.info["streams"]["audio"]) == 0:
@@ -87,7 +87,12 @@ class FFMPEG():
             if not Vcallback is None:
                 self.loadinfo.update(Vcallback=Vcallback)
             mux_source.append(self.loadinfo["Vstream"])
-        self.loadPacket=self.av.demux(*mux_source)
+        if not audio is None and not video is None:
+            self.loadPacket=self.av.demux(*mux_source)
+        elif not audio is None:
+            self.loadPacket=self.av.decode(self.loadinfo["Astream"])
+        elif not video is None:
+            self.loadPacket=self.av.decode(self.loadinfo["Vstream"])
         self.loadStatus="load"
         if block:
             self._LOAD()
@@ -116,7 +121,10 @@ class FFMPEG():
                         req.append("a")
                 if "a" in req or "v" in req:
                     try:
-                        frame=next(self.loadPacket).decode()[0]
+                        if "Vstream" in info and "Astream" in info:
+                            frame=next(self.loadPacket).decode()[0]
+                        else:
+                            frame=next(self.loadPacket)
                     except StopIteration:
                         self.loadStatus="pause"
                         print("stopIt")
@@ -130,10 +138,14 @@ class FFMPEG():
                                 frame=info["Acallback"](frame)
                             #print("Aqueue_f=",info["Aqueue"])
                             info["Aqueue"].put(frame, timeout=3)
+                            if info["Aqueue"].qsize() > info["queueMax"]:
+                                info["Aqueue"].get()
                         elif type(frame) == av.video.VideoFrame and "Vqueue" in info:
                             if "Vcallback" in info:
                                 frame=info["Vcallback"](frame)
                             info["Vqueue"].put(frame)
+                            if info["Vqueue"].qsize() > info["queueMax"]:
+                                info["Vqueue"].get()
                         else:
                             print("Unknown frame!")
                             print(type(frame))

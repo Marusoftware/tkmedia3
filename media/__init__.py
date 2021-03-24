@@ -19,7 +19,7 @@ class Media():
         if not audio is None:
             self.audio=Audio(self.stream, mode="w")
             args.update(AchBrkSCB=self.audio._play_AchBrkSCB)
-        self.stream.LOAD(audio=audio, video=video, block=False, Acallback=Util.toSdArray, Vcallback=Util.toImage, **args)
+        self.stream.LOAD(audio=audio, video=video, block=False, Acallback=Util.toSdArray, **args)#, Vcallback=Util.toImage, **args)
         while not self.stream.loaded:
             time.sleep(1/1000)
         if not audio is None:
