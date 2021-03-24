@@ -1,4 +1,4 @@
-import av, queue, threading, time
+import av, queue, threading, time, numpy
 from av import codec, filter
 from  av.audio.fifo import AudioFifo 
 import av.datasets
@@ -7,9 +7,24 @@ try:
 except:
     from exception import MediaFileError
 
+class Util():
+    def toImage(frame):
+        return frame.to_image()
+    def toSdArray(frame):
+        return numpy.rot90(frame.to_ndarray(), -1)
+
 class Filter():
-    def __init__(self):
+    def __init__(self, stream=None, width=None, height=None, format=None, name=None):
         self.filter=filter.Graph()
+        self.src=self.filter.add_buffer(template=stream, width=width, height=height, format=format, name=name)
+    def addFilter(self, filter, arg):
+        f = self.filter.add(filter=filter, args=arg)
+        self.src.link_to(f)
+        f.link_to(self.filter.add("buffersink"))
+        self.filter.configure()
+    def Process(self, frame):
+        self.filter.push(frame=frame)
+        return (frame.index,self.filter.pull())
 
 class FFMPEG():
     def __init__(self):
@@ -53,26 +68,38 @@ class FFMPEG():
             pass
         #self.CLOSE = self.av.close
         #self.SEEK = self.av.seek
-    def LOAD(self, audio=None, video=None, block=False, Aspeed=1, Vspeed=1, Aqueue=queue.SimpleQueue(), Vqueue=queue.SimpleQueue(), border=100):
+    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.SimpleQueue(), Vqueue=queue.SimpleQueue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None):
         self.loadinfo={"AstreamN":audio, "VstreamN":video, "border":border}
+        mux_source=[]
         if not audio is None:
             if len(self.info["streams"]["audio"]) == 0:
                 raise MediaFileError("This File doesn't contain audio.")
-            self.loadinfo.update([("Astream",self.streams.get(audio=audio)),("Aspeed",Aspeed),("Aqueue",Aqueue)])
+            self.loadinfo.update([("Astream",self.streams.get(audio=audio)),("Aqueue",Aqueue)])
+            if not Acallback is None:
+                self.loadinfo.update(Acallback=Acallback)
+            if not AchBrkSCB is None:
+                self.loadinfo.update(AchBrkSCB=AchBrkSCB)
+            mux_source.append(self.loadinfo["Astream"])
         if not video is None:
             if len(self.info["streams"]["video"]) == 0:
                 raise MediaFileError("This File doesn't contain video.")
-            self.loadinfo.update([("Vstream",self.streams.get(video=video)),("Vspeed",Vspeed),("Vqueue",Vqueue)])
-        self.loadPacket=self.av.demux(audio=audio, video=video)
+            self.loadinfo.update([("Vstream",self.streams.get(video=video)),("Vqueue",Vqueue)])
+            if not Vcallback is None:
+                self.loadinfo.update(Vcallback=Vcallback)
+            mux_source.append(self.loadinfo["Vstream"])
+        self.loadPacket=self.av.demux(*mux_source)
         self.loadStatus="load"
-        self.loaded=True
-        self.loadThread=threading.Thread(target=self._LOAD)
-        self.loadThread.start()
+        if block:
+            self._LOAD()
+        else:
+            self.loadThread=threading.Thread(target=self._LOAD)
+            self.loadThread.start()
 
     def _LOAD(self):
         info=self.loadinfo
         while 1:
             if self.loadStatus == "stop":
+                self.loaded=False
                 break
             elif self.loadStatus == "pause":
                 while self.loadStatus == "pause":
@@ -92,16 +119,27 @@ class FFMPEG():
                         frame=next(self.loadPacket).decode()[0]
                     except StopIteration:
                         self.loadStatus="pause"
+                        print("stopIt")
                     else:
                         if type(frame) == av.audio.AudioFrame and "Aqueue" in info:
-                            info["Aqueue"].put(frame)
+                            if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != frame.samples:
+                                if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != 0 and "AchBrkSCB" in info:
+                                    info["AchBrkSCB"]()
+                                self.info["streams"]["audio"][info["AstreamN"]]["frame_size"]=frame.samples
+                            if "Acallback" in info:
+                                frame=info["Acallback"](frame)
+                            #print("Aqueue_f=",info["Aqueue"])
+                            info["Aqueue"].put(frame, timeout=3)
                         elif type(frame) == av.video.VideoFrame and "Vqueue" in info:
+                            if "Vcallback" in info:
+                                frame=info["Vcallback"](frame)
                             info["Vqueue"].put(frame)
                         else:
                             print("Unknown frame!")
                             print(type(frame))
                             self.loadStatus="stop"
                 else:
+                    self.loaded=True
                     time.sleep(1/1000)
     def CLOSE(self):
         if self.loaded:
