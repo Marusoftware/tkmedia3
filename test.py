@@ -71,6 +71,10 @@
 #     v.Stop()
 #     a.Stop()
 #     root.destroy()
-import media
+import media, tkinter
+root=tkinter.Tk()
 a = media.Media("/home/maruo/ビデオ/test.mp4","r")
-a.Play(audio=0, video=0, audioDevice="default")
+l = tkinter.Label(root)
+l.pack(fill="both", expand="true")
+a.Play(audio=0, video=0, audioDevice="default", videoFrame=l)
+root.mainloop()

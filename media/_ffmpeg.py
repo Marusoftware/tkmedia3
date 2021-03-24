@@ -9,7 +9,7 @@ except:
 
 class Util():
     def toImage(frame):
-        return frame.to_image()
+        return (frame.index, frame.to_image())
     def toSdArray(frame):
         return numpy.rot90(frame.to_ndarray(), -1)
 
@@ -49,7 +49,7 @@ class FFMPEG():
                         codec=st.codec_context
                         o = {"duration":st.duration, "id":st.id, "index":st.index, "lang":st.language, "meta":st.metadata,
                         "frame_count":st.frames, "bit_rate":codec.bit_rate, "codec_name":codec.name, "codec_long":codec.codec.long_name,
-                        "delay":codec.codec.delay, "time_base":st.time_base}
+                        "delay":codec.codec.delay, "time_base":st.time_base, "start_time":st.start_time}
                         if st.type == "audio":
                             o.update(channel=codec.channels, channel_name=codec.layout.name, sample_rate=st.sample_rate, frame_size=codec.frame_size)
                         elif st.type == "video":
@@ -88,7 +88,7 @@ class FFMPEG():
                 self.loadinfo.update(Vcallback=Vcallback)
             mux_source.append(self.loadinfo["Vstream"])
         if not audio is None and not video is None:
-            self.loadPacket=self.av.demux(*mux_source)
+            self.loadPacket=self.av.demux(audio=audio, video=video)
         elif not audio is None:
             self.loadPacket=self.av.decode(self.loadinfo["Astream"])
         elif not video is None:

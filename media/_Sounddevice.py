@@ -21,10 +21,8 @@ class Sounddevice():
         elif self.mode == "w":
             if not "callback" in streamOptions: streamOptions.update(callback=self._Queue)
             self.sdStream= sounddevice.OutputStream(dtype="float32", **streamOptions)
-            print(streamOptions)
         else:
             raise ModeError("Unknown mode.")
-        #print(dataQueue)
         if dataQueue is None:
             if self.mode == "rw":
                 self.dataQueue = (queue.SimpleQueue(), queue.SimpleQueue())
@@ -33,7 +31,6 @@ class Sounddevice():
         else:
             self.dataQueue=dataQueue
         self.state="stop"
-        #print(self.dataQueue)
     def Record(self):
         if self.mode == "w": raise ModeError("Can't record in write Mode.")
         if self.mode == "rw" and self.state == "play": self.state = "both"
