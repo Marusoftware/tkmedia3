@@ -122,7 +122,11 @@ class FFMPEG():
                 if "a" in req or "v" in req:
                     try:
                         if "Vstream" in info and "Astream" in info:
-                            frame=next(self.loadPacket).decode()[0]
+                            try:
+                                frame=next(self.loadPacket).decode()
+                                frame=frame[0]
+                            except IndexError:
+                                print(frame)
                         else:
                             frame=next(self.loadPacket)
                     except StopIteration:

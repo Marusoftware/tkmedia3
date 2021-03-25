@@ -71,9 +71,9 @@
 #     v.Stop()
 #     a.Stop()
 #     root.destroy()
-import media, tkinter
+import media, tkinter, tkinter.filedialog as fd
 root=tkinter.Tk()
-a = media.Media("/home/maruo/ビデオ/test.mp4","r")
+a = media.Media(fd.askopenfilename(),"r")
 l = tkinter.Label(root)
 l.pack(fill="both", expand="true")
 a.Play(audio=0, video=0, audioDevice="default", videoFrame=l)

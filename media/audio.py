@@ -20,7 +20,6 @@ class Audio():
         info=self.ffmpeg.info["streams"]["audio"][self.ffmpeg.loadinfo["AstreamN"]]
         self.channels=channels
         self.device=device
-        #print("Aqueue=",self.ffmpeg.loadinfo["Aqueue"])
         self.sdStream=Sounddevice(mode=self.mode, dataQueue=self.ffmpeg.loadinfo["Aqueue"], streamOptions={"samplerate":info["sample_rate"], "blocksize":info["frame_size"], "channels":self.channels, "device":self.device})
         self.played=True
         time.sleep(info["start_time"])
