@@ -68,7 +68,7 @@ class FFMPEG():
             pass
         #self.CLOSE = self.av.close
         #self.SEEK = self.av.seek
-    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.SimpleQueue(), Vqueue=queue.SimpleQueue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None, queueMax=300):
+    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.Queue(), Vqueue=queue.Queue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None, queueMax=300):
         self.loadinfo={"AstreamN":audio, "VstreamN":video, "border":border, "queueMax":queueMax}
         mux_source=[]
         if not audio is None:
