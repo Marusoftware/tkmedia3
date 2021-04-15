@@ -71,9 +71,11 @@
 #     v.Stop()
 #     a.Stop()
 #     root.destroy()
-import media, tkinter, tkinter.filedialog as fd
+import media, tkinter, tkinter.filedialog as fd, os
 root=tkinter.Tk()
-a = media.Media(fd.askopenfilename(),"r")
+root.menu=tkinter.Menu(root)
+root.config(menu=root.menu)
+a = media.Media(fd.askopenfilename(initialdir=os.path.expanduser("~")),"r")
 l = tkinter.Label(root)
 l.pack(fill="both", expand="true")
 a.Play(audio=0, video=0, audioDevice="default", videoFrame=l)

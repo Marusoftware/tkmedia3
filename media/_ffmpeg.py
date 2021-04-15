@@ -24,7 +24,7 @@ class Filter():
         self.filter.configure()
     def Process(self, frame):
         self.filter.push(frame=frame)
-        return (frame.index,self.filter.pull())
+        return (frame.index, self.filter.pull())
 
 class FFMPEG():
     def __init__(self):
@@ -126,7 +126,8 @@ class FFMPEG():
                                 frame=next(self.loadPacket).decode()
                                 frame=frame[0]
                             except IndexError:
-                                print(frame)
+                                print("Frame error!",frame)
+                                self.loadStatus="pause"
                         else:
                             frame=next(self.loadPacket)
                     except StopIteration:
