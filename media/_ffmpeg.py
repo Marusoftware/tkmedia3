@@ -141,7 +141,6 @@ class FFMPEG():
                                 self.info["streams"]["audio"][info["AstreamN"]]["frame_size"]=frame.samples
                             if "Acallback" in info:
                                 frame=info["Acallback"](frame)
-                            #print("Aqueue_f=",info["Aqueue"])
                             info["Aqueue"].put(frame, timeout=3)
                             if info["Aqueue"].qsize() > info["queueMax"]:
                                 info["Aqueue"].get()

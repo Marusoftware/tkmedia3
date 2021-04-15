@@ -2,6 +2,12 @@ from . import video, audio, picture, exception
 from ._ffmpeg import FFMPEG, Filter, Util, time
 from .lib import StopWatch
 
+__version__="0.0.3"
+__license__="GPL v2"
+__author__="Marusoftware"
+__author_email__="marusoftware@outlook.jp"
+__url__="https://marusoftware.net"
+
 Video = video.Video
 Audio = audio.Audio
 Picture = picture.Picture

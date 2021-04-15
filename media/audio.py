@@ -24,3 +24,7 @@ class Audio():
         self.played=True
         time.sleep(info["start_time"])
         self.sdStream.Play()
+    def pause(self):
+        if not self.ffmpeg.loaded: raise WrongOrderError("Stream is not loaded.")
+        if not self.played: raise WrongOrderError("Already paused.")
+        self.sdStream.Stop()

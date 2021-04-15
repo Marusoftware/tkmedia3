@@ -44,6 +44,8 @@ class Sounddevice():
     def Stop(self):
         self.state="stop"
         self.sdStream.stop()
+    def Pause(self):
+        self.state="pause"
     def _Queue(self, data, frames, time, status):
         if self.state == "play":
             data[:] = self.dataQueue.get()
