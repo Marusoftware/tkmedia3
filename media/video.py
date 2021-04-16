@@ -162,4 +162,12 @@ class Video():
                 #self.frame.after(int(frame[0]*sleep_time-self.timer.getTime()), self._play)
             else:
                 self.frame.after(0, self._play)
-                
+        elif self.state == "pause":
+            pass
+    def pause(self):
+        self.timer.stop()
+        self.state = "pause"
+    def restart(self):
+        self.timer.start()
+        self.state = "play"
+        self.frame.after(0, self._play)

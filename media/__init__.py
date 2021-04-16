@@ -19,11 +19,14 @@ class Media():
         self.stream.OPEN(url, mode, avformat)
         self.info=self.stream.info
         self.streams=self.stream.streams
+        self.watch = StopWatch()
     def Play(self, audioDevice=None, videoFrame=None, video=None, audio=None):
         args={}
         if not video is None:
+            self.streams.video[video].thread_type="AUTO"
             self.video=Video(self.stream)
         if not audio is None:
+            self.streams.audio[video].thread_type="AUTO"
             self.audio=Audio(self.stream, mode="w")
             args.update(AchBrkSCB=self.audio._play_AchBrkSCB)
         self.stream.LOAD(audio=audio, video=video, block=False, Acallback=Util.toSdArray, Vcallback=Util.toImage, **args)
@@ -33,4 +36,23 @@ class Media():
             self.audio.play()
         if not video is None:
             self.video.play(videoFrame, frame_type="label")
-        
+        self.watch.start()
+    def Stop(self):
+        try:
+            self.video.pause()
+        except: pass
+        try:
+            self.audio.pause()
+        except: pass
+        self.watch.stop()
+        self.stream.SEEK(self.watch.getTime())
+    def Restart(self, videoFrame=None):
+        while not self.stream.loaded:
+            time.sleep(1/1000)
+        try:
+            self.audio.play()
+        except: pass
+        try:
+            self.video.restart()
+        except: pass
+        self.watch.start()

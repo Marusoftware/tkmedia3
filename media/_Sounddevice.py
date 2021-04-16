@@ -1,5 +1,5 @@
 import sounddevice, queue
-from .exception import ModeError
+from .exception import ModeError, WrongOrderError
 
 def getDevices(device=None, kind=None):
     return list(sounddevice.query_devices(device=device, kind=kind))
@@ -38,6 +38,8 @@ class Sounddevice():
         self.sdStream.start()
     def Play(self):
         if self.mode == "r": raise ModeError("Can't play in read Mode.")
+        if self.state in ["both", "play", "rec"]:
+            raise WrongOrderError("Alredy Played.")
         if self.mode == "rw" and self.state == "rec": self.state = "both"
         else: self.state="play"
         self.sdStream.start()
@@ -49,13 +51,18 @@ class Sounddevice():
     def _Queue(self, data, frames, time, status):
         if self.state == "play":
             data[:] = self.dataQueue.get()
-        if self.state == "rec":
+        elif self.state == "rec":
             self.dataQueue.put(data)
-        if self.state == "stop":
-            pass
+        elif self.state == "stop":
+            raise sounddevice.CallbackAbort
+        elif self.state == "pause":
+            raise sounddevice.CallbackAbort
     def _Queue2(self, indata, outdata, frames, time, status):
         if self.state == "both":
             self.dataQueue[0].put(indata)
             outdata[:] = self.dataQueue[1].get()
-        if self.state == "stop":
-            pass
+        elif self.state == "stop":
+            raise sounddevice.CallbackAbort
+        elif self.state == "pause":
+            raise sounddevice.CallbackAbort
+        

@@ -72,11 +72,18 @@
 #     a.Stop()
 #     root.destroy()
 import media, tkinter, tkinter.filedialog as fd, os
+
+def stop():
+    a.Stop()
+    root.b.configure(text="Play", command=play)
+def play():
+    a.Restart(videoFrame=l)
+    root.b.configure(text="Stop", command=stop)
 root=tkinter.Tk()
-root.menu=tkinter.Menu(root)
-root.config(menu=root.menu)
 a = media.Media(fd.askopenfilename(initialdir=os.path.expanduser("~")),"r")
 l = tkinter.Label(root)
 l.pack(fill="both", expand="true")
+root.b = tkinter.Button(text="Stop", command=stop)
+root.b.pack()
 a.Play(audio=0, video=0, audioDevice="default", videoFrame=l)
 root.mainloop()

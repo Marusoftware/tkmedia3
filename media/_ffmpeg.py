@@ -157,6 +157,20 @@ class FFMPEG():
                 else:
                     self.loaded=True
                     time.sleep(1/1000)
+    def SEEK(self, point):
+        if self.loaded:
+            self.loadStatus = "pause"
+            if "Vqueue" in self.loadinfo:
+                while 1:
+                    try: self.loadinfo["Vqueue"].get(block=False)
+                    except queue.Empty: break
+            if "Aqueue" in self.loadinfo:
+                while 1:
+                    try: self.loadinfo["Aqueue"].get(block=False)
+                    except queue.Empty: break
+            self.av.seek(int(point))
+            self.loadStatus="load"
+            print(int(point))
     def CLOSE(self):
         if self.loaded:
             self.loadStatus="stop"
