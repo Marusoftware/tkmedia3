@@ -120,43 +120,30 @@ class FFMPEG():
                     if info["Aqueue"].qsize() <= info["border"]:
                         req.append("a")
                 if "a" in req or "v" in req:
-                    try:
-                        if "Vstream" in info and "Astream" in info:
-                            try:
-                                frame=next(self.loadPacket).decode()
-                                frame=frame[0]
-                            except IndexError:
-                                print("Frame error!",frame)
-                                self.loadStatus="pause"
-                        else:
-                            frame=next(self.loadPacket)
-                    except StopIteration:
-                        self.loadStatus="pause"
-                        print("stopIt")
-                    else:
-                        if type(frame) == av.audio.AudioFrame and "Aqueue" in info:
-                            if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != frame.samples:
-                                if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != 0 and "AchBrkSCB" in info:
-                                    info["AchBrkSCB"]()
-                                self.info["streams"]["audio"][info["AstreamN"]]["frame_size"]=frame.samples
-                            if "Acallback" in info:
-                                frame=info["Acallback"](frame)
-                            info["Aqueue"].put(frame, timeout=3)
-                            if info["Aqueue"].qsize() > info["queueMax"]:
-                                info["Aqueue"].get()
-                        elif type(frame) == av.video.VideoFrame and "Vqueue" in info:
-                            if "Vcallback" in info:
-                                frame=info["Vcallback"](frame)
-                            info["Vqueue"].put(frame)
-                            if info["Vqueue"].qsize() > info["queueMax"]:
-                                info["Vqueue"].get()
-                        else:
-                            print("Unknown frame!")
-                            print(type(frame))
-                            self.loadStatus="stop"
+                    frame=self._getFrame(info)
+                    if frame:
+                        self._putFrame(frame, info)
                 else:
                     self.loaded=True
                     time.sleep(1/1000)
+            elif "seek" in self.loadStatus:
+                self.loaded=False
+                point = float(self.loadStatus.split(" ")[1])
+                info=self.loadinfo
+                frame=self._getFrame(info)
+                if frame:
+                    if point-frame.time>=0:
+                        while 1:
+                            if point-frame.time>0:
+                                pass
+                            elif point-frame.time<=0:
+                                self._putFrame(frame, info)
+                                break
+                            frame=self._getFrame(info)
+                        self.loadStatus="load"
+                    elif point-frame.time<0:
+                        self.av.seek(0)
+
     def SEEK(self, point):
         if self.loaded:
             self.loadStatus = "pause"
@@ -164,14 +151,55 @@ class FFMPEG():
                 while 1:
                     try: self.loadinfo["Vqueue"].get(block=False)
                     except queue.Empty: break
+                #self.av.seek(int(point), stream=self.loadinfo["Vstream"][0])
             if "Aqueue" in self.loadinfo:
                 while 1:
                     try: self.loadinfo["Aqueue"].get(block=False)
                     except queue.Empty: break
-            self.av.seek(int(point))
-            self.loadStatus="load"
-            print(int(point))
+                #self.av.seek(int(point), stream=self.loadinfo["Astream"][0])
+            self.loadStatus="seek "+str(point)            
+            #self.loadStatus="load"
+            #print(int(point))
     def CLOSE(self):
         if self.loaded:
+            self.loadStatus="stop"
+    def _getFrame(self, info):
+        try:
+            if "Vstream" in info and "Astream" in info:
+                try:
+                    frame=next(self.loadPacket).decode()
+                    frame=frame[0]
+                except IndexError:
+                    print("Frame error!",frame)
+                    self.loadStatus="pause"
+                    return False
+            else:
+                frame=next(self.loadPacket)
+        except StopIteration:
+            self.loadStatus="pause"
+            print("stopIt")
+            return False
+        else:
+            return frame
+    def _putFrame(self, frame, info):
+        if type(frame) == av.audio.AudioFrame and "Aqueue" in info:
+            if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != frame.samples:
+                if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != 0 and "AchBrkSCB" in info:
+                    info["AchBrkSCB"]()
+                self.info["streams"]["audio"][info["AstreamN"]]["frame_size"]=frame.samples
+            if "Acallback" in info:
+                frame=info["Acallback"](frame)
+            info["Aqueue"].put(frame, timeout=3)
+            if info["Aqueue"].qsize() > info["queueMax"]:
+                info["Aqueue"].get()
+        elif type(frame) == av.video.VideoFrame and "Vqueue" in info:
+            if "Vcallback" in info:
+                frame=info["Vcallback"](frame)
+            info["Vqueue"].put(frame)
+            if info["Vqueue"].qsize() > info["queueMax"]:
+                info["Vqueue"].get()
+        else:
+            print("Unknown frame!")
+            print(type(frame))
             self.loadStatus="stop"
                 
