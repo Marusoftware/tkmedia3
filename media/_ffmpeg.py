@@ -142,7 +142,7 @@ class FFMPEG():
                             frame=self._getFrame(info)
                         self.loadStatus="load"
                     elif point-frame.time<0:
-                        self.av.seek(0)
+                        self.av.seek(-1)
 
     def SEEK(self, point):
         if self.loaded:
