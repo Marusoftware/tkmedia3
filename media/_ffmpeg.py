@@ -7,9 +7,15 @@ try:
 except:
     from exception import MediaFileError
 
+global toImage_safe
+toImage_safe=0
+
 class Util():
     def toImage(frame):
-        return (frame.index, frame.to_image())
+        if toImage_safe:
+            return (frame.index, frame.to_rgb().to_image())
+        else:
+            return (frame.index, frame.to_image())
     def toSdArray(frame):
         return numpy.rot90(frame.to_ndarray(), -1)
 

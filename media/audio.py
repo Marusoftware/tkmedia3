@@ -1,4 +1,4 @@
-from ._Sounddevice import Sounddevice
+from ._Sounddevice import Sounddevice, getDevices, getHostApi, getVersion
 from .exception import WrongOrderError
 import time
 
