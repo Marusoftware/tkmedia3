@@ -37,7 +37,7 @@ class Audio():
         #self.sdStream=Sounddevice(mode=self.mode, dataQueue=self.ffmpeg.loadinfo["Aqueue"], streamOptions={"samplerate":info["sample_rate"], "blocksize":info["frame_size"], "channels":self.channels, "device":self.device})
         self.sdStream=PyAudio(mode=self.mode, rate=info["sample_rate"], channels=self.channels, dataQueue=self.ffmpeg.loadinfo["Aqueue"], streamOptions=self.streamOptions)
         self.played=True
-        time.sleep(info["start_time"])
+        #time.sleep(info["start_time"])
         self.sdStream.Play()
     def pause(self):
         if not self.ffmpeg.loaded: raise WrongOrderError("Stream is not loaded.")

@@ -11,7 +11,7 @@ global toImage_safe
 toImage_safe=0
 
 class Util():
-    def toImage(frame):
+    def toImage(self, frame):
         if toImage_safe:
             return (frame.index, frame.to_rgb().to_image())
         else:
@@ -74,7 +74,7 @@ class FFMPEG():
             pass
         #self.CLOSE = self.av.close
         #self.SEEK = self.av.seek
-    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.Queue(), Vqueue=queue.Queue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None, queueMax=300):
+    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.Queue(), Vqueue=queue.Queue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None, queueMax=300, point=0):
         self.loadinfo={"AstreamN":audio, "VstreamN":video, "border":border, "queueMax":queueMax}
         mux_source=[]
         if not audio is None:
@@ -100,6 +100,7 @@ class FFMPEG():
         elif not video is None:
             self.loadPacket=self.av.decode(self.loadinfo["Vstream"])
         self.loadStatus="load"
+        self.av.seek(point)
         if block:
             self._LOAD()
         else:
@@ -128,7 +129,7 @@ class FFMPEG():
                 if "a" in req or "v" in req:
                     frame=self._getFrame(info)
                     if frame:
-                        self._putFrame(frame, info)
+                        self._putFrame(frame)
                 else:
                     self.loaded=True
                     time.sleep(1/1000)
@@ -143,12 +144,12 @@ class FFMPEG():
                             if point-frame.time>0:
                                 pass
                             elif point-frame.time<=0:
-                                self._putFrame(frame, info)
+                                self._putFrame(frame)
                                 break
                             frame=self._getFrame(info)
                         self.loadStatus="load"
                     elif point-frame.time<0:
-                        self.av.seek(-1)
+                        self.av.seek(0)
 
     def SEEK(self, point):
         if self.loaded:
@@ -177,7 +178,7 @@ class FFMPEG():
                     frame=frame[0]
                 except IndexError:
                     print("Frame error!",frame)
-                    self.loadStatus="pause"
+                    #self.loadStatus="pause"
                     return False
             else:
                 frame=next(self.loadPacket)
@@ -187,20 +188,21 @@ class FFMPEG():
             return False
         else:
             return frame
-    def _putFrame(self, frame, info):
+    def _putFrame(self, frame):
+        info=self.loadinfo
         if type(frame) == av.audio.AudioFrame and "Aqueue" in info:
-            if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != frame.samples:
-                if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != 0 and "AchBrkSCB" in info:
-                    info["AchBrkSCB"]()
-                self.info["streams"]["audio"][info["AstreamN"]]["frame_size"]=frame.samples
+            #if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != frame.samples and "AchBrkSCB" in info:
+            #    self.info["streams"]["audio"][info["AstreamN"]]["frame_size"]=frame.samples
+            #    if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != 0 and "AchBrkSCB" in info:
+            #        info["AchBrkSCB"]()
             if "Acallback" in info:
-                frame=info["Acallback"](frame)
+                frame=info["Acallback"](self, frame)
             info["Aqueue"].put(frame, timeout=3)
             if info["Aqueue"].qsize() > info["queueMax"]:
                 info["Aqueue"].get()
         elif type(frame) == av.video.VideoFrame and "Vqueue" in info:
             if "Vcallback" in info:
-                frame=info["Vcallback"](frame)
+                frame=info["Vcallback"](self, frame)
             info["Vqueue"].put(frame)
             if info["Vqueue"].qsize() > info["queueMax"]:
                 info["Vqueue"].get()
