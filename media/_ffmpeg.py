@@ -17,7 +17,7 @@ class Util():
         else:
             return (frame.index, frame.to_image())
     def toSdArray(frame):
-        return numpy.rot90(frame.to_ndarray(), -1)
+        return numpy.rot90(frame.to_ndarray(), -1).copy(order='C')
 
 class Filter():
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):

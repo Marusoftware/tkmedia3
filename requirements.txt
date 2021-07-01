@@ -1,4 +1,4 @@
 av
 numpy
 Pillow
-sounddevice
+PyAudio
