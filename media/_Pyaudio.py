@@ -1,6 +1,6 @@
 import pyaudio
 
-import sounddevice, queue
+import queue
 from .exception import ModeError, WrongOrderError
 
 portaudio=pyaudio.PyAudio()
@@ -96,10 +96,3 @@ class PyAudio():
         elif state == "both":
             self.dataQueue[0].put(data)
             return (self.dataQueue[1].get(), pyaudio.paContinue)
-    #def _Queue2(self, indata, outdata, frames, time, status):
-    #    if self.state == "both":
-    #        self.dataQueue[0].put(indata)
-    #        outdata[:] = self.dataQueue[1].get()
-    #    elif self.state == "stop":
-    #        raise sounddevice.CallbackAbort
-        

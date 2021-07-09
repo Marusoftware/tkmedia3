@@ -3,7 +3,6 @@ from ._Pyaudio import PyAudio, getDevices, getHostApi, getVersion
 from .exception import WrongOrderError
 import time
 
-
 class Audio():
     def __init__(self, stream, mode="w"):
         self.ffmpeg = stream
@@ -11,7 +10,7 @@ class Audio():
         self.played=False
     def _play_AchBrkSCB(self):
         if self.played:
-            self.sdStream.Stop()
+            self.sdStream.Close()
             info=self.ffmpeg.info["streams"]["audio"][self.ffmpeg.loadinfo["AstreamN"]]
             #self.sdStream=Sounddevice(mode=self.mode, dataQueue=self.ffmpeg.loadinfo["Aqueue"], streamOptions={"samplerate":info["sample_rate"], "blocksize":info["frame_size"], "channels":2, "channels":self.channels, "device":self.device})
             self.sdStream=PyAudio(mode=self.mode, rate=info["sample_rate"], channels=self.channels, dataQueue=self.ffmpeg.loadinfo["Aqueue"], streamOptions=self.streamOptions)

@@ -164,10 +164,18 @@ class Video():
                 self.frame.after(0, self._play)
         elif self.state == "pause":
             pass
+        elif self.state == "stop":
+            pass
+    
     def pause(self):
-        self.timer.stop()
         self.state = "pause"
+        self.timer.stop()
+        
     def restart(self):
-        self.timer.start()
         self.state = "play"
         self.frame.after(0, self._play)
+        self.timer.start()
+    
+    def close(self):
+        self.state="stop"
+        self.timer.stop()

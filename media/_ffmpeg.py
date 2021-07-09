@@ -16,7 +16,7 @@ class Util():
             return (frame.index, frame.to_rgb().to_image())
         else:
             return (frame.index, frame.to_image())
-    def toSdArray(frame):
+    def toSdArray(self, frame):
         return numpy.rot90(frame.to_ndarray(), -1).copy(order='C')
 
 class Filter():
@@ -170,6 +170,7 @@ class FFMPEG():
     def CLOSE(self):
         if self.loaded:
             self.loadStatus="stop"
+        self.av.close()
     def _getFrame(self, info):
         try:
             if "Vstream" in info and "Astream" in info:

@@ -3,7 +3,8 @@ try:
     from .exception import WrongOrderError
 except:
     from exception import WrongOrderError
-#import platform
+
+# import platform
 # import tkinter.filedialog as _fd1
 # fdmode=0
 # if platform.system() in ["Linux", "Darwin"]:

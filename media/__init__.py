@@ -59,3 +59,12 @@ class Media():
             self.video.restart()
         except: pass
         self.watch.start()
+    def Close(self):
+        self.Stop()
+        try:
+            self.audio.close()
+        except: pass
+        try:
+            self.video.close()
+        except: pass
+        self.stream.CLOSE()
