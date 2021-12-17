@@ -45,11 +45,12 @@ class Media():
             self.audio.pause()
         except: pass
         self.watch.stop()
-        try:
-            self.video.timer.setTime(self.watch.getTime())
-        except: pass
+        #try:
+        #    self.video.timer.setTime(self.watch.getTime())
+        #except: pass
         self.stream.SEEK(self.watch.getTime())
     def Restart(self, videoFrame=None):
+        self.stream.loadStatus="load"
         while not self.stream.loaded:
             time.sleep(1/1000)
         try:

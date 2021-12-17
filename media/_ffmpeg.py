@@ -17,7 +17,8 @@ class Util():
         else:
             return (frame.index, frame.to_image())
     def toSdArray(self, frame):
-        return numpy.rot90(frame.to_ndarray(), -1).copy(order='C')
+        #return numpy.rot90(frame.to_ndarray(), -1).copy(order='C')
+        return numpy.transpose(frame.to_ndarray()).copy(order='C')
 
 class Filter():
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):
@@ -80,7 +81,7 @@ class FFMPEG():
         if not audio is None:
             if len(self.info["streams"]["audio"]) == 0:
                 raise MediaFileError("This File doesn't contain audio.")
-            self.loadinfo.update([("Astream",self.streams.get(audio=audio)),("Aqueue",Aqueue)])
+            self.loadinfo.update([("AStreamN",audio),("Astream",self.streams.get(audio=audio)),("Aqueue",Aqueue)])
             if not Acallback is None:
                 self.loadinfo.update(Acallback=Acallback)
             if not AchBrkSCB is None:
@@ -89,7 +90,7 @@ class FFMPEG():
         if not video is None:
             if len(self.info["streams"]["video"]) == 0:
                 raise MediaFileError("This File doesn't contain video.")
-            self.loadinfo.update([("Vstream",self.streams.get(video=video)),("Vqueue",Vqueue)])
+            self.loadinfo.update([("VStreamN",video),("Vstream",self.streams.get(video=video)),("Vqueue",Vqueue)])
             if not Vcallback is None:
                 self.loadinfo.update(Vcallback=Vcallback)
             mux_source.append(self.loadinfo["Vstream"])
@@ -164,9 +165,16 @@ class FFMPEG():
                     try: self.loadinfo["Aqueue"].get(block=False)
                     except queue.Empty: break
                 #self.av.seek(int(point), stream=self.loadinfo["Astream"][0])
-            self.loadStatus="seek "+str(point)            
+            #self.loadStatus="seek "+str(point)            
             #self.loadStatus="load"
             #print(int(point))
+            self.av.seek(int(point))
+            if "Astream" in self.loadinfo and "Vstream" in self.loadinfo:
+                self.loadPacket=self.av.demux(audio=self.loadinfo["AstreamN"], video=self.loadinfo["VstreamN"])
+            elif "Astream" in self.loadinfo:
+                self.loadPacket=self.av.decode(self.loadinfo["Astream"])
+            elif "Vstream" in self.loadinfo:
+                self.loadPacket=self.av.decode(self.loadinfo["Vstream"])
     def CLOSE(self):
         if self.loaded:
             self.loadStatus="stop"
@@ -178,7 +186,7 @@ class FFMPEG():
                     frame=next(self.loadPacket).decode()
                     frame=frame[0]
                 except IndexError:
-                    print("Frame error!",frame)
+                    print("Frame error!")
                     #self.loadStatus="pause"
                     return False
             else:

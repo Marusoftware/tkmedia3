@@ -150,7 +150,13 @@ class Video():
             info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loadinfo["VstreamN"]]
             frame=self.ffmpeg.loadinfo["Vqueue"].get()
             sleep_time=1/info["fps"]
-            if frame[0]*sleep_time >= self.timer.getTime():
+            gap=self.timer.getTime()-frame[0]*sleep_time
+            border=1
+            if gap<float(0):
+                self.frame.after(0, self._play)
+            if gap>float(border):
+                self.frame.after(int(gap), self._play)
+            if gap<=float(border):
                 if not self.old_frame is None:
                     self.old_frame.close()
                     self.old_frame2=self.tkimage
@@ -159,9 +165,7 @@ class Video():
                     self.frame.configure(image=self.tkimage)
                 self.old_frame=frame[1]
                 self.frame.after(int(sleep_time*1000), self._play)
-                #self.frame.after(int(frame[0]*sleep_time-self.timer.getTime()), self._play)
-            else:
-                self.frame.after(0, self._play)
+                #self.frame.after(int(frame[0]*sleep_time-self.timer.getTime()), self._play)   
         elif self.state == "pause":
             pass
         elif self.state == "stop":
@@ -172,6 +176,7 @@ class Video():
         self.timer.stop()
         
     def restart(self):
+        print(self.timer.getTime())
         self.state = "play"
         self.frame.after(0, self._play)
         self.timer.start()

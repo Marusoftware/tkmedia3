@@ -1,3 +1,4 @@
+from os import stat
 import pyaudio
 
 import queue
@@ -85,6 +86,7 @@ class PyAudio():
         self.state="close"
         self.sdStream.close()
     def _Queue(self, data, frames, time, status):
+        print(frames)
         state = self.state
         if state == "play":
             return(self.dataQueue.get(), pyaudio.paContinue)
