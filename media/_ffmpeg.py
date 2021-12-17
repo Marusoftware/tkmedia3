@@ -17,7 +17,6 @@ class Util():
         else:
             return (frame.index, frame.to_image())
     def toSdArray(self, frame):
-        #return numpy.rot90(frame.to_ndarray(), -1).copy(order='C')
         return numpy.transpose(frame.to_ndarray()).copy(order='C')
 
 class Filter():
@@ -37,8 +36,8 @@ class FFMPEG():
     def __init__(self):
         self.av = None
         self.loaded=False
-    def OPEN(self, path, mode="r", avformat=None):
-        self.av = av.open(av.datasets.curated(path), mode=mode, format=avformat)
+    def OPEN(self, path, mode="r", **options):
+        self.av = av.open(av.datasets.curated(path), mode=mode, **options)
         self.info = {
             "codec_name" : self.av.format.name.split(","),
             "codec_long" : self.av.format.long_name,
