@@ -1,13 +1,15 @@
 #from ._Sounddevice import Sounddevice, getDevices, getHostApi, getVersion
+from .lib import StopWatch
 from ._Pyaudio import PyAudio, getDevices, getHostApi, getVersion
 from .exception import WrongOrderError
 import time
 
 class Audio():
-    def __init__(self, stream, mode="w"):
+    def __init__(self, stream, mode="w", stopwatch=StopWatch(error=True)):
         self.ffmpeg = stream
         self.mode=mode
         self.played=False
+        self.stopwatch=stopwatch
     def _play_AchBrkSCB(self):
         if self.played:
             self.sdStream.Close()

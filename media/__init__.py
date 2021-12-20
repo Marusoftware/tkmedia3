@@ -38,9 +38,9 @@ class Media():
         """
         args={}
         if not video is None:
-            self.video=Video(self.stream)
+            self.video=Video(self.stream, mode="w", stopwatch=self.watch)
         if not audio is None:
-            self.audio=Audio(self.stream, mode="w")
+            self.audio=Audio(self.stream, mode="w", stopwatch=self.watch)
             args.update(AchBrkSCB=self.audio._play_AchBrkSCB)
         self.stream.LOAD(audio=audio, video=video, block=False, Acallback=Util.toSdArray, Vcallback=Util.toImage, **args)
         while not self.stream.loaded:
@@ -79,4 +79,4 @@ class Media():
             self.video.close()
         except: pass
         self.stream.CLOSE()
-        self.status("status":"close")
+        self.status={"status":"close"}

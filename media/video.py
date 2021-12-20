@@ -3,11 +3,11 @@ from .lib import StopWatch
 from PIL import ImageTk
 
 class Video():
-    def __init__(self, stream, mode="w"):
+    def __init__(self, stream, mode="w", stopwatch=StopWatch(error=False)):
         self.ffmpeg = stream
         self.mode=mode
         self.played=False
-        self.timer=StopWatch(error=False)
+        self.stopwatch=stopwatch
         self.state="stop"
         self.old_frame=None
         self.old_frame2=None
@@ -17,8 +17,8 @@ class Video():
         info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loadinfo["VstreamN"]]
         self.frame=frame
         self.frame_type=frame_type
-        self.timer.setTime(info["start_time"])
-        self.timer.start()
+        self.stopwatch.setTime(info["start_time"])
+        self.stopwatch.start()
         self.state="play"
         self.frame.after(info["start_time"], self._play)
         self.played=True
@@ -27,7 +27,7 @@ class Video():
             info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loadinfo["VstreamN"]]
             frame=self.ffmpeg.loadinfo["Vqueue"].get()
             sleep_time=1/info["fps"]
-            gap=self.timer.getTime()-frame[0]*sleep_time
+            gap=self.stopwatch.getTime()-frame[0]*sleep_time
             border=1
             if gap<float(0):
                 self.frame.after(0, self._play)
@@ -50,14 +50,14 @@ class Video():
     
     def pause(self):
         self.state = "pause"
-        self.timer.stop()
+        self.stopwatch.stop()
         
     def restart(self):
         print(self.timer.getTime())
         self.state = "play"
         self.frame.after(0, self._play)
-        self.timer.start()
+        self.stopwatch.start()
     
     def close(self):
         self.state="stop"
-        self.timer.stop()
+        self.stopwatch.stop()
