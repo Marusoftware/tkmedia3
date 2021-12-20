@@ -19,7 +19,7 @@ class Media():
         """
         Initialize media library.
         url(str or file-like object): Media file url. This will pass to ffmpeg.
-        mode(str): Opening mode. You can set to 'r', 'w' or 'rw'.
+        mode(str): Opening mode. You can set to 'r' or 'w'.
         **options: Options for PyAV.
         """
         self.stream = FFMPEG()

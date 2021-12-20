@@ -1,5 +1,5 @@
 import av, queue, threading, time, numpy
-from av import codec, filter
+from av import filter
 from  av.audio.fifo import AudioFifo 
 import av.datasets
 try:
@@ -43,7 +43,7 @@ class FFMPEG():
             "codec_long" : self.av.format.long_name,
             "mode" : mode
         }
-        if mode == "rw" or mode == "r":
+        if mode == "r":
             self.streams = self.av.streams
             self.info.update(bit_rate=self.av.bit_rate)
             self.info.update(duration=self.av.duration)
@@ -69,12 +69,9 @@ class FFMPEG():
                 "subtitles" : _stream_info(self.streams.subtitles),
                 "other" : _stream_info(self.streams.other)
             })
-        elif mode == "rw" or mode == "w":
-            #self.ADD=self.av.add_stream
+        elif mode == "w":
             pass
-        #self.CLOSE = self.av.close
-        #self.SEEK = self.av.seek
-    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.Queue(), Vqueue=queue.Queue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None, queueMax=300, point=0):
+    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.Queue(), Vqueue=queue.Queue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None, queueMax=300):
         self.loadinfo={"AstreamN":audio, "VstreamN":video, "border":border, "queueMax":queueMax}
         mux_source=[]
         if not audio is None:
@@ -100,13 +97,12 @@ class FFMPEG():
         elif not video is None:
             self.loadPacket=self.av.decode(self.loadinfo["Vstream"])
         self.loadStatus="load"
-        self.av.seek(point)
         if block:
             self._LOAD()
         else:
             self.loadThread=threading.Thread(target=self._LOAD)
             self.loadThread.start()
-
+            self.loadThread.setDaemon(True)
     def _LOAD(self):
         info=self.loadinfo
         while 1:
@@ -158,15 +154,10 @@ class FFMPEG():
                 while 1:
                     try: self.loadinfo["Vqueue"].get(block=False)
                     except queue.Empty: break
-                #self.av.seek(int(point), stream=self.loadinfo["Vstream"][0])
             if "Aqueue" in self.loadinfo:
                 while 1:
                     try: self.loadinfo["Aqueue"].get(block=False)
                     except queue.Empty: break
-                #self.av.seek(int(point), stream=self.loadinfo["Astream"][0])
-            #self.loadStatus="seek "+str(point)            
-            #self.loadStatus="load"
-            #print(int(point))
             self.av.seek(int(point))
             if "Astream" in self.loadinfo and "Vstream" in self.loadinfo:
                 self.loadPacket=self.av.demux(audio=self.loadinfo["AstreamN"], video=self.loadinfo["VstreamN"])
