@@ -36,19 +36,17 @@ class Media():
         video(int): video stream number
         audio(int): audio stream number
         """
-        args={}
         if not video is None:
             self.video=Video(self.stream, mode="w", stopwatch=self.watch)
         if not audio is None:
             self.audio=Audio(self.stream, mode="w", stopwatch=self.watch)
-            args.update(AchBrkSCB=self.audio._play_AchBrkSCB)
-        self.stream.LOAD(audio=audio, video=video, block=False, Acallback=Util.toSdArray, Vcallback=Util.toImage, **args)
+        self.stream.LOAD(audio=audio, video=video, block=False, Acallback=Util.toSdArray, Vcallback=Util.toImage)
         while not self.stream.loaded:
             time.sleep(1/1000)
         if not audio is None:
             self.audio.play(device=audioDevice)
         if not video is None:
-            self.video.play(videoFrame, frame_type="label")
+            self.video.play(frame=videoFrame, frame_type="label")
         self.watch.start()
         self.status={"status":"playing"}
     def Pause(self):
@@ -65,7 +63,7 @@ class Media():
         self.status={"status":"pause"}
     def Seek(self):
         """
-        Seek media.
+        Seek media.(Now NO-OP)
         """
     def Close(self):
         """
