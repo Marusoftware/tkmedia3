@@ -1,23 +1,17 @@
-import av, queue, threading, time, numpy
+import av, threading, time, numpy, warnings
 from av import filter
 from  av.audio.fifo import AudioFifo 
+from queue import Full, Queue
 import av.datasets
-try:
-    from .exception import MediaFileError
-except:
-    from exception import MediaFileError
+from .exception import MediaFileError
 
-global toImage_safe
-toImage_safe=0
-
-class Util():
-    def toImage(self, frame):
-        if toImage_safe:
-            return (frame.index, frame.to_rgb().to_image())
-        else:
-            return (frame.index, frame.to_image())
-    def toSdArray(self, frame):
-        return numpy.transpose(frame.to_ndarray()).copy(order='C')
+def toImage(frame):
+    try:
+        return frame.to_rgb().to_image()
+    except:
+        return frame.to_image()
+def toSdArray(frame):
+    return numpy.transpose(frame.to_ndarray()).copy(order='C')
 
 class Filter():
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):
@@ -32,23 +26,22 @@ class Filter():
         self.filter.push(frame=frame)
         return (frame.index, self.filter.pull())
 
-class FFMPEG():
-    def __init__(self):
-        self.av = None
-        self.loaded=False
-    def OPEN(self, path, mode="r", **options):
-        self.av = av.open(av.datasets.curated(path), mode=mode, **options)
+class Stream():
+    def __init__(self, path, mode="r", **options):#TODO: write support
+        self.video=None
+        self.audio=None
+        self.ffmpeg = av.open(av.datasets.curated(path), mode=mode, **options)
         self.info = {
-            "codec_name" : self.av.format.name.split(","),
-            "codec_long" : self.av.format.long_name,
+            "codec_name" : self.ffmpeg.format.name.split(","),
+            "codec_long" : self.ffmpeg.format.long_name,
             "mode" : mode
         }
+        self.streams = self.ffmpeg.streams
         if mode == "r":
-            self.streams = self.av.streams
-            self.info.update(bit_rate=self.av.bit_rate)
-            self.info.update(duration=self.av.duration)
-            self.info.update(size=self.av.size)
-            self.info.update(start_time=self.av.start_time)
+            self.info.update(bit_rate=self.ffmpeg.bit_rate)
+            self.info.update(duration=self.ffmpeg.duration)
+            self.info.update(size=self.ffmpeg.size)
+            self.info.update(start_time=self.ffmpeg.start_time)
             def _stream_info(streams):
                 def toDict(st):
                     if st.type == "video" or st.type == "audio":
@@ -69,144 +62,130 @@ class FFMPEG():
                 "subtitles" : _stream_info(self.streams.subtitles),
                 "other" : _stream_info(self.streams.other)
             })
+            self.loader={"state":"stop", "thread":None, "queue_min":100, "queue_max":300, "audio":None, "video":None, "loaded":False, "audio_processor":[toSdArray], "video_processor":[toImage], "frame_size": 0}
         elif mode == "w":
             pass
-    def LOAD(self, audio=None, video=None, block=False, Aqueue=queue.Queue(), Vqueue=queue.Queue(), border=100, Acallback=None, Vcallback=None, AchBrkSCB=None, queueMax=300):
-        self.loadinfo={"AstreamN":audio, "VstreamN":video, "border":border, "queueMax":queueMax}
+    def load(self, audio=None, video=None, queue_min=None, queue_max=None, wait=True, point=0):
+        self.ffmpeg.seek(point)
+        if not queue_min is None:
+            self.loader["queue_min"]=queue_min
+        if not queue_max is None:
+            self.loader["queue_max"]=queue_max
         mux_source=[]
         if not audio is None:
             if len(self.info["streams"]["audio"]) == 0:
                 raise MediaFileError("This File doesn't contain audio.")
-            self.loadinfo.update([("AStreamN",audio),("Astream",self.streams.get(audio=audio)),("Aqueue",Aqueue)])
-            if not Acallback is None:
-                self.loadinfo.update(Acallback=Acallback)
-            if not AchBrkSCB is None:
-                self.loadinfo.update(AchBrkSCB=AchBrkSCB)
-            mux_source.append(self.loadinfo["Astream"])
+            if len(self.info["streams"]["audio"]) < audio:
+                raise MediaFileError(f"Audio stream '{audio}' is not exists.")
+            self.loader["audio"]=audio
+            self._audioPreQ=AudioFifo()
+            self._audioQ=Queue(maxsize=self.loader["queue_max"])
+            self.loader["frame_size"]=self.info["streams"]["audio"][audio]["frame_size"]
+            mux_source.append(self.streams.get(audio=audio))
         if not video is None:
             if len(self.info["streams"]["video"]) == 0:
                 raise MediaFileError("This File doesn't contain video.")
-            self.loadinfo.update([("VStreamN",video),("Vstream",self.streams.get(video=video)),("Vqueue",Vqueue)])
-            if not Vcallback is None:
-                self.loadinfo.update(Vcallback=Vcallback)
-            mux_source.append(self.loadinfo["Vstream"])
+            if len(self.info["streams"]["video"]) < video:
+                raise MediaFileError(f"Video stream '{video}' is not exists.")
+            self.loader["video"]=video
+            self._videoQ=Queue(maxsize=self.loader["queue_max"])
+            mux_source.append(self.streams.get(video=video))
+        if audio is None and video is None:
+            return
         if not audio is None and not video is None:
-            self.loadPacket=self.av.demux(audio=audio, video=video)
+            self.loader["generator"]=self.ffmpeg.demux(audio=audio, video=video)
         elif not audio is None:
-            self.loadPacket=self.av.decode(self.loadinfo["Astream"])
+            self.loader["generator"]=self.ffmpeg.decode(self.loadinfo["Astream"])
         elif not video is None:
-            self.loadPacket=self.av.decode(self.loadinfo["Vstream"])
-        self.loadStatus="load"
-        if block:
-            self._LOAD()
-        else:
-            self.loadThread=threading.Thread(target=self._LOAD)
-            self.loadThread.start()
-            self.loadThread.setDaemon(True)
-    def _LOAD(self):
-        info=self.loadinfo
-        while 1:
-            if self.loadStatus == "stop":
-                self.loaded=False
+            self.loader["generator"]=self.ffmpeg.decode(self.loadinfo["Vstream"])
+        self.loader["state"]="load"
+        self.loader["thread"]=threading.Thread(target=self._loader)
+        self.loader["thread"].start()
+        self.loader["thread"].setDaemon(True)
+        if wait:
+            while True:
+                if self.loader["loaded"]:
+                    break
+                time.sleep(0.1)
+    def _loader(self):
+        for frame in self.loader["generator"]:
+            if self.loader["state"] == "stop":
                 break
-            elif self.loadStatus == "pause":
-                while self.loadStatus == "pause":
-                    time.sleep(1/1000)
-            elif self.loadStatus == "reload":
-                info=self.loadinfo
-            elif self.loadStatus == "load":
-                req=[]
-                if "Vqueue" in info:
-                    if info["Vqueue"].qsize() <= info["border"]:
-                        req.append("v")
-                if "Aqueue" in info:
-                    if info["Aqueue"].qsize() <= info["border"]:
-                        req.append("a")
-                if "a" in req or "v" in req:
-                    frame=self._getFrame(info)
-                    if frame:
-                        self._putFrame(frame)
-                else:
-                    self.loaded=True
-                    time.sleep(1/1000)
-            elif "seek" in self.loadStatus:
-                self.loaded=False
-                point = float(self.loadStatus.split(" ")[1])
-                info=self.loadinfo
-                frame=self._getFrame(info)
-                if frame:
-                    if point-frame.time>=0:
-                        while 1:
-                            if point-frame.time>0:
-                                pass
-                            elif point-frame.time<=0:
-                                self._putFrame(frame)
-                                break
-                            frame=self._getFrame(info)
-                        self.loadStatus="load"
-                    elif point-frame.time<0:
-                        self.av.seek(0)
-
-    def SEEK(self, point):
-        if self.loaded:
-            self.loadStatus = "pause"
-            if "Vqueue" in self.loadinfo:
-                while 1:
-                    try: self.loadinfo["Vqueue"].get(block=False)
-                    except queue.Empty: break
-            if "Aqueue" in self.loadinfo:
-                while 1:
-                    try: self.loadinfo["Aqueue"].get(block=False)
-                    except queue.Empty: break
-            self.av.seek(int(point))
-            if "Astream" in self.loadinfo and "Vstream" in self.loadinfo:
-                self.loadPacket=self.av.demux(audio=self.loadinfo["AstreamN"], video=self.loadinfo["VstreamN"])
-            elif "Astream" in self.loadinfo:
-                self.loadPacket=self.av.decode(self.loadinfo["Astream"])
-            elif "Vstream" in self.loadinfo:
-                self.loadPacket=self.av.decode(self.loadinfo["Vstream"])
-    def CLOSE(self):
-        if self.loaded:
-            self.loadStatus="stop"
-        self.av.close()
-    def _getFrame(self, info):
-        try:
-            if "Vstream" in info and "Astream" in info:
-                try:
-                    frame=next(self.loadPacket).decode()
-                    frame=frame[0]
-                except IndexError:
-                    print("Frame error!")
-                    #self.loadStatus="pause"
-                    return False
+            if self._audioQ.qsize() >= self.loader["queue_min"] and self._videoQ.qsize() >= self.loader["queue_min"]:
+                self.loader["loaded"]=True
             else:
-                frame=next(self.loadPacket)
-        except StopIteration:
-            self.loadStatus="pause"
-            print("stopIt")
-            return False
+                self.loader["loaded"]=False
+            req=[]
+            while len(req)==0:
+                if self.loader["status"] == "pause":
+                    time.sleep(0.001)
+                    continue
+                if not self.loader["audio"] is None and self._audioQ.qsize() < self.loader["queue_max"]:
+                    req.append("a")
+                if not self.loader["video"] is None and self._videoQ.qsize() < self.loader["queue_max"]:
+                    req.append("v")
+                time.sleep(0.001)
+            if isinstance(frame, list):
+                frames=frame
+            else:
+                frames=[frame]
+            if self.loader["state"] == "seek":
+                if int(frame.loader["seek_to"]) == int(frames[0].time):
+                    self.loader["state"]="load"
+                elif int(frame.loader["seek_to"]) > int(frames[0].time):
+                    self.loader["state"]="load"
+                    continue
+                else:
+                    self.loader["state"]="reload"
+                    break
+            for frame in frames:
+                if isinstance(frame, av.audio.AudioFrame):
+                    self._audioPreQ.write(frame)
+                    frame=self._audioPreQ.read(self._loader["frame_size"])
+                    if not frame is None:
+                        for processor in self.loader["audio_processor"]:
+                            frame=processor(frame)
+                        try:
+                            self._audioQ.put_nowait(frame)
+                        except Full:
+                            warnings.warn("Can't put frame to audio queue.(Queue is full)", ResourceWarning)
+                elif isinstance(frame, av.video.VideoFrame):
+                    for processor in self.loader["video_processor"]:
+                        frame=processor(frame)
+                    try:
+                        self._videoQ.put_nowait(frame)
+                    except Full:
+                        warnings.warn("Can't put frame to video queue.(Queue is full)", ResourceWarning)
+                else:
+                    warnings.warn("Unknown frame type.", Warning)
         else:
-            return frame
-    def _putFrame(self, frame):
-        info=self.loadinfo
-        if type(frame) == av.audio.AudioFrame and "Aqueue" in info:
-            #if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != frame.samples and "AchBrkSCB" in info:
-            #    self.info["streams"]["audio"][info["AstreamN"]]["frame_size"]=frame.samples
-            #    if self.info["streams"]["audio"][info["AstreamN"]]["frame_size"] != 0 and "AchBrkSCB" in info:
-            #        info["AchBrkSCB"]()
-            if "Acallback" in info:
-                frame=info["Acallback"](self, frame)
-            info["Aqueue"].put(frame, timeout=3)
-            if info["Aqueue"].qsize() > info["queueMax"]:
-                info["Aqueue"].get()
-        elif type(frame) == av.video.VideoFrame and "Vqueue" in info:
-            if "Vcallback" in info:
-                frame=info["Vcallback"](self, frame)
-            info["Vqueue"].put(frame)
-            if info["Vqueue"].qsize() > info["queueMax"]:
-                info["Vqueue"].get()
-        else:
-            print("Unknown frame!")
-            print(type(frame))
+            self.loader["state"]="stop"
+            return
+    def seek(self, point):
+        self.loader["seek_to"]=point
+        self.loader["state"]="seek"
+        while self.loader["state"]=="seek":
+            pass
+        return True if self.loader["state"] == "load" else False
+    def clear(self):
+        if hasattr(self, "_audioPreQ"):
+            self._audioPreQ.read(0)
+        if hasattr(self, "_audioQ"):
+            while 1:
+                try:
+                    self._audioQ.get_nowait()
+                except:
+                    pass
+        if hasattr(self, "_videoQ"):
+            while 1:
+                try:
+                    self._videoQ.get_nowait()
+                except:
+                    pass
+    def pause(self):
+        self.loader["state"]="pause"
+    def close(self):
+        if self.loaded:
             self.loadStatus="stop"
+        self.ffmpeg.close()
                 
