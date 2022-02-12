@@ -23,7 +23,7 @@ class Media():
         self.ffmpeg=Stream(url, mode, **options)
         self.info=self.ffmpeg.info
         self.ffmpegs=self.ffmpeg.streams
-        self.watch=StopWatch(error=False)
+        self.stopwatch=self.ffmpeg.stopwatch
         self.status="pause"
     def Play(self, audioDevice=None, videoFrame=None, video=None, audio=None, frame_type="label"):
         """
@@ -36,14 +36,13 @@ class Media():
         """
         self.ffmpeg.load(audio=audio, video=video, wait=True)
         if not video is None:
-            self.video=Video(self.ffmpeg, mode="w", stopwatch=self.watch)
+            self.video=Video(self.ffmpeg, mode="w")
         if not audio is None:
-            self.audio=Audio(self.ffmpeg, mode="w", stopwatch=self.watch)
+            self.audio=Audio(self.ffmpeg, mode="w")
         if not audio is None:
             self.audio.play(device=audioDevice)
         if not video is None:
             self.video.play(frame=videoFrame, frame_type=frame_type)
-        self.watch.start()
         self.status="play"
     def Pause(self):
         """
@@ -56,19 +55,40 @@ class Media():
         try:
             self.audio.pause()
         except: pass
-        self.watch.stop()
         self.status="pause"
+    def Resume(self):
+        self.ffmpeg.resume()
+        try:
+            self.video.resume()
+        except: pass
+        try:
+            self.audio.resume()
+        except: pass
+        self.status="play"
     def Seek(self, point):
         """
-        Seek media.(Now NO-OP)
+        Seek media.
         """
         req_reload=not self.ffmpeg.seek(point)
         self.status="pause"
+    def Stop(self):
+        """
+        Stop media.
+        """
+        self.ffmpeg.stop()
+        try:
+            self.video.stop()
+            pass
+        except: pass
+        try:
+            self.audio.stop()
+        except: pass
+        self.status="stop"
     def Close(self):
         """
         Close media.
         """
-        self.Stop()
+        if self.status !="stop": self.Stop()
         try:
             self.audio.close()
         except: pass

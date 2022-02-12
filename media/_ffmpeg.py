@@ -30,7 +30,7 @@ class Filter():
 
 class Stream():
     def __init__(self, path, mode="r", **options):#TODO: write support
-        self.watch=StopWatch(error=False)
+        self.stopwatch=StopWatch(error=False)
         self.ffmpeg = av.open(av.datasets.curated(path), mode=mode, **options)
         self.info = {
             "codec_name" : self.ffmpeg.format.name.split(","),
@@ -102,12 +102,12 @@ class Stream():
         self.loader["state"]="load"
         self.loader["thread"]=threading.Thread(target=self._loader)
         self.loader["thread"].start()
-        #self.loader["thread"].setDaemon(True)
         if wait:
             while True:
                 if self.loader["loaded"]:
                     break
                 time.sleep(0.1)
+        self.stopwatch.start()
     def _loader(self):
         for frame in self.loader["generator"]:
             if self.loader["state"] == "stop":
@@ -149,17 +149,16 @@ class Stream():
                         try:
                             self._audioQ.put_nowait(frame)
                         except Full:
-                            warnings.warn("Can't put frame to audio queue.(Queue is full)", ResourceWarning)
+                            warnings.warn("Can't put frame to audio queue.(Queue is full)", Warning)
                 elif isinstance(frame, av.video.VideoFrame):
                     for processor in self.loader["video_processor"]:
                         frame=processor(frame)
                     try:
                         self._videoQ.put_nowait(frame)
                     except Full:
-                        warnings.warn("Can't put frame to video queue.(Queue is full)", ResourceWarning)
+                        warnings.warn("Can't put frame to video queue.(Queue is full)", Warning)
                 else:
                     warnings.warn("Unknown frame type.", Warning)
-            print("\r", self._audioQ.qsize(), self._videoQ.qsize(), end="")
         else:
             self.loader["state"]="stop"
             return
@@ -186,8 +185,13 @@ class Stream():
                     pass
     def pause(self):
         self.loader["state"]="pause"
+        self.stopwatch.stop()
+    def resume(self):
+        self.loader["state"]="load"
+        self.stopwatch.start()
+    def stop(self):
+        self.loader["state"]="stop"
+        self.stopwatch.stop()
     def close(self):
-        if self.loaded:
-            self.loadStatus="stop"
+        self.stopwatch.stop()
         self.ffmpeg.close()
-                

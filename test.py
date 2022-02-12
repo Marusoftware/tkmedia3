@@ -74,10 +74,10 @@
 import media, tkinter, tkinter.filedialog as fd, os
 
 def stop():
-    a.Stop()
+    a.Pause()
     root.b1.configure(text="Play", command=play)
 def play():
-    a.Restart(videoFrame=l)
+    a.Resume()
     root.b1.configure(text="Stop", command=stop)
 root=tkinter.Tk()
 a = media.Media(fd.askopenfilename(initialdir=os.path.expanduser("~")),"r")
