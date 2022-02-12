@@ -50,7 +50,12 @@ class Sounddevice():
         self.state="pause"
     def _Queue(self, data, frames, time, status):
         if self.state == "play":
-            data[:] = self.dataQueue.get()
+            try:
+                frame_time, datafQ=self.dataQueue.get_nowait()
+                data[:] = datafQ
+                print("\r", int(frame_time), int(time.inputBufferDacTime), len(data), frames, status, end="")
+            except:
+                data.fill(0)
         elif self.state == "rec":
             self.dataQueue.put(data)
         elif self.state == "stop":

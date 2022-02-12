@@ -2,7 +2,7 @@ from .audio import Audio
 from .video import Video
 from .picture import Picture
 from .exception import MediaFileError
-from ._ffmpeg import Stream, Filter, Util, time
+from ._ffmpeg import Stream, Filter, time
 from .lib import StopWatch
 
 __version__="0.1.0"
@@ -23,7 +23,7 @@ class Media():
         self.ffmpeg=Stream(url, mode, **options)
         self.info=self.ffmpeg.info
         self.ffmpegs=self.ffmpeg.streams
-        self.watch=StopWatch()
+        self.watch=StopWatch(error=False)
         self.status="pause"
     def Play(self, audioDevice=None, videoFrame=None, video=None, audio=None, frame_type="label"):
         """
@@ -75,5 +75,5 @@ class Media():
         try:
             self.video.close()
         except: pass
-        self.ffmpeg.CLOSE()
+        self.ffmpeg.close()
         self.status="close"

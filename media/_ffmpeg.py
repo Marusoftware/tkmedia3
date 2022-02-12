@@ -4,14 +4,16 @@ from  av.audio.fifo import AudioFifo
 from queue import Full, Queue
 import av.datasets
 from .exception import MediaFileError
+from .lib import StopWatch
 
 def toImage(frame):
+    print("\r", frame.time, end="")
     try:
-        return frame.to_rgb().to_image()
+        return (frame.time, frame.to_rgb().to_image())
     except:
-        return frame.to_image()
+        return (frame.time, frame.to_image())
 def toSdArray(frame):
-    return numpy.transpose(frame.to_ndarray()).copy(order='C')
+    return (frame.time, numpy.transpose(frame.to_ndarray()).copy(order='C'))
 
 class Filter():
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):
@@ -28,8 +30,7 @@ class Filter():
 
 class Stream():
     def __init__(self, path, mode="r", **options):#TODO: write support
-        self.video=None
-        self.audio=None
+        self.watch=StopWatch(error=False)
         self.ffmpeg = av.open(av.datasets.curated(path), mode=mode, **options)
         self.info = {
             "codec_name" : self.ffmpeg.format.name.split(","),
@@ -101,7 +102,7 @@ class Stream():
         self.loader["state"]="load"
         self.loader["thread"]=threading.Thread(target=self._loader)
         self.loader["thread"].start()
-        self.loader["thread"].setDaemon(True)
+        #self.loader["thread"].setDaemon(True)
         if wait:
             while True:
                 if self.loader["loaded"]:
@@ -117,7 +118,7 @@ class Stream():
                 self.loader["loaded"]=False
             req=[]
             while len(req)==0:
-                if self.loader["status"] == "pause":
+                if self.loader["state"] == "pause":
                     time.sleep(0.001)
                     continue
                 if not self.loader["audio"] is None and self._audioQ.qsize() < self.loader["queue_max"]:
@@ -125,8 +126,8 @@ class Stream():
                 if not self.loader["video"] is None and self._videoQ.qsize() < self.loader["queue_max"]:
                     req.append("v")
                 time.sleep(0.001)
-            if isinstance(frame, list):
-                frames=frame
+            if isinstance(frame, av.packet.Packet):
+                frames=frame.decode()
             else:
                 frames=[frame]
             if self.loader["state"] == "seek":
@@ -141,7 +142,7 @@ class Stream():
             for frame in frames:
                 if isinstance(frame, av.audio.AudioFrame):
                     self._audioPreQ.write(frame)
-                    frame=self._audioPreQ.read(self._loader["frame_size"])
+                    frame=self._audioPreQ.read(self.loader["frame_size"])
                     if not frame is None:
                         for processor in self.loader["audio_processor"]:
                             frame=processor(frame)
@@ -158,6 +159,7 @@ class Stream():
                         warnings.warn("Can't put frame to video queue.(Queue is full)", ResourceWarning)
                 else:
                     warnings.warn("Unknown frame type.", Warning)
+                    frame
         else:
             self.loader["state"]="stop"
             return

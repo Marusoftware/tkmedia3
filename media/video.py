@@ -13,8 +13,8 @@ class Video():
         self.old_frame2=None
         self.tkimage=None
     def play(self, frame, frame_type):
-        if not self.ffmpeg.loaded: raise WrongOrderError("Stream is not loaded.")
-        info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loadinfo["VstreamN"]]
+#        if not self.ffmpeg.loaded: raise WrongOrderError("Stream is not loaded.")
+        info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loader["video"]]
         self.frame=frame
         self.frame_type=frame_type
         self.stopwatch.setTime(info["start_time"])
@@ -24,10 +24,10 @@ class Video():
         self.played=True
     def _play(self):
         if self.state=="play":
-            info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loadinfo["VstreamN"]]
-            frame=self.ffmpeg.loadinfo["Vqueue"].get()
+            info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loader["video"]]
+            frame=self.ffmpeg._videoQ.get()
             sleep_time=1/info["fps"]
-            gap=self.stopwatch.getTime()-frame[0]*sleep_time
+            gap=self.stopwatch.getTime()-frame[0]
             border=1
             if gap<float(0):
                 self.frame.after(0, self._play)
