@@ -1,8 +1,8 @@
 from .audio import Audio
 from .video import Video
 from .picture import Picture
-from .exception import MediaFileError
-from ._ffmpeg import Stream, Filter, time
+from .exception import MediaFileError, ModeError, WrongOrderError
+from ._ffmpeg import Stream, Filter
 from .lib import StopWatch
 
 __version__="0.1.0"

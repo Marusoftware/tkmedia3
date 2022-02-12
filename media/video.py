@@ -1,7 +1,7 @@
 from .exception import WrongOrderError
-from .lib import StopWatch
 from PIL import ImageTk
 from queue import Empty
+
 class Video():
     def __init__(self, stream, mode="w"):
         self.ffmpeg = stream

@@ -7,7 +7,6 @@ from .exception import MediaFileError
 from .lib import StopWatch
 
 def toImage(frame):
-    #print("\r", frame.time, end="")
     try:
         return (frame.time, frame.to_image())
     except:
