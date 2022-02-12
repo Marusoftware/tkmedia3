@@ -59,7 +59,7 @@ class Sounddevice():
         if self.state == "play":
             try:
                 gap=self.stopwatch.getTime()-self.last_frametime
-                border=1
+                border=0.5
                 if gap<float(0):
                     data.fill(0)
                 else:

@@ -26,7 +26,7 @@ class Video():
             frame=self.ffmpeg._videoQ.get_nowait()
             sleep_time=1/info["fps"]
             gap=self.stopwatch.getTime()-frame[0]
-            border=1
+            border=0.5
             if gap<float(0):
                 self.frame.after(0, self._play)
             elif gap>float(border):

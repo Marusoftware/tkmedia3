@@ -9,9 +9,9 @@ from .lib import StopWatch
 def toImage(frame):
     #print("\r", frame.time, end="")
     try:
-        return (frame.time, frame.to_rgb().to_image())
-    except:
         return (frame.time, frame.to_image())
+    except:
+        return (frame.time, frame.to_rgb().to_image())
 def toSdArray(frame):
     return (frame.time, numpy.transpose(frame.to_ndarray()).copy(order='C'))
 
