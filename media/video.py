@@ -25,7 +25,7 @@ class Video():
     def _play(self):
         if self.state=="play":
             info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loader["video"]]
-            frame=self.ffmpeg._videoQ.get()
+            frame=self.ffmpeg._videoQ.get_nowait()
             sleep_time=1/info["fps"]
             gap=self.stopwatch.getTime()-frame[0]
             border=1

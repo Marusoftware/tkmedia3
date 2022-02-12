@@ -53,8 +53,8 @@ class Sounddevice():
             try:
                 frame_time, datafQ=self.dataQueue.get_nowait()
                 data[:] = datafQ
-                print("\r", int(frame_time), int(time.inputBufferDacTime), len(data), frames, status, end="")
-            except:
+                #print("\r", int(frame_time), int(time.outputBufferDacTime), len(data), frames, status, end="")
+            except queue.Empty:
                 data.fill(0)
         elif self.state == "rec":
             self.dataQueue.put(data)

@@ -7,7 +7,7 @@ from .exception import MediaFileError
 from .lib import StopWatch
 
 def toImage(frame):
-    print("\r", frame.time, end="")
+    #print("\r", frame.time, end="")
     try:
         return (frame.time, frame.to_rgb().to_image())
     except:
@@ -121,9 +121,9 @@ class Stream():
                 if self.loader["state"] == "pause":
                     time.sleep(0.001)
                     continue
-                if not self.loader["audio"] is None and self._audioQ.qsize() < self.loader["queue_max"]:
+                if not self.loader["audio"] is None and self._audioQ.qsize() < self.loader["queue_min"]:
                     req.append("a")
-                if not self.loader["video"] is None and self._videoQ.qsize() < self.loader["queue_max"]:
+                if not self.loader["video"] is None and self._videoQ.qsize() < self.loader["queue_min"]:
                     req.append("v")
                 time.sleep(0.001)
             if isinstance(frame, av.packet.Packet):
@@ -159,7 +159,7 @@ class Stream():
                         warnings.warn("Can't put frame to video queue.(Queue is full)", ResourceWarning)
                 else:
                     warnings.warn("Unknown frame type.", Warning)
-                    frame
+            print("\r", self._audioQ.qsize(), self._videoQ.qsize(), end="")
         else:
             self.loader["state"]="stop"
             return
