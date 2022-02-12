@@ -1,5 +1,8 @@
-from . import video, audio, picture, exception
-from ._ffmpeg import FFMPEG, Filter, Util, time
+from .audio import Audio
+from .video import Video
+from .picture import Picture
+from .exception import MediaFileError
+from ._ffmpeg import Stream, Filter, time
 from .lib import StopWatch
 
 __version__="0.1.0"
@@ -7,12 +10,7 @@ __license__="MIT License with Marusoftware License"
 __author__="Marusoftware"
 __author_email__="marusoftware@outlook.jp"
 __url__="https://marusoftware.net"
-__all__=["Video","Audio","Picture","Media", "Filter"]
-
-Video = video.Video
-Audio = audio.Audio
-Picture = picture.Picture
-MediaFileError=exception.MediaFileError
+__all__=["Video", "Audio", "Picture", "Media", "Filter"]
 
 class Media():
     def __init__(self, url, mode="r", **options):
@@ -22,59 +20,80 @@ class Media():
         mode(str): Opening mode. You can set to 'r' or 'w'.
         **options: Options for PyAV.
         """
-        self.stream = FFMPEG()
-        self.stream.OPEN(url, mode, **options)
-        self.info=self.stream.info
-        self.streams=self.stream.streams
-        self.watch = StopWatch()
-        self.status={"status":"pause"}
-    def Play(self, audioDevice=None, videoFrame=None, video=None, audio=None):
+        self.ffmpeg=Stream(url, mode, **options)
+        self.info=self.ffmpeg.info
+        self.ffmpegs=self.ffmpeg.streams
+        self.stopwatch=self.ffmpeg.stopwatch
+        self.status="pause"
+    def Play(self, audioDevice=None, videoFrame=None, video=None, audio=None, frame_type="label"):
         """
         Play media.
         audioDevice(int): An number of Device(You can get with media.audio.getDevices func)
-        videoFrame(tkinter.Frame): An frame to playing video
+        videoFrame(tkinter.Label or tkinter.Canvas): An frame to playing video
+        frame_type(str): videoFrame type(Label->label, Canvas->canvas)
         video(int): video stream number
         audio(int): audio stream number
         """
+        self.ffmpeg.load(audio=audio, video=video, wait=True)
         if not video is None:
-            self.video=Video(self.stream, mode="w", stopwatch=self.watch)
+            self.video=Video(self.ffmpeg, mode="w")
         if not audio is None:
-            self.audio=Audio(self.stream, mode="w", stopwatch=self.watch)
-        self.stream.LOAD(audio=audio, video=video, block=False, Acallback=Util.toSdArray, Vcallback=Util.toImage)
-        while not self.stream.loaded:
-            time.sleep(1/1000)
+            self.audio=Audio(self.ffmpeg, mode="w")
         if not audio is None:
             self.audio.play(device=audioDevice)
         if not video is None:
-            self.video.play(frame=videoFrame, frame_type="label")
-        self.watch.start()
-        self.status={"status":"playing"}
+            self.video.play(frame=videoFrame, frame_type=frame_type)
+        self.status="play"
     def Pause(self):
         """
         Pause playing.
         """
+        self.ffmpeg.pause()
         try:
             self.video.pause()
         except: pass
         try:
             self.audio.pause()
         except: pass
-        self.watch.stop()
-        self.status={"status":"pause"}
-    def Seek(self):
+        self.status="pause"
+    def Resume(self):
+        self.ffmpeg.resume()
+        try:
+            self.video.resume()
+        except: pass
+        try:
+            self.audio.resume()
+        except: pass
+        self.status="play"
+    def Seek(self, point):
         """
-        Seek media.(Now NO-OP)
+        Seek media.
         """
+        req_reload=not self.ffmpeg.seek(point)
+        self.status="pause"
+    def Stop(self):
+        """
+        Stop media.
+        """
+        self.ffmpeg.stop()
+        try:
+            self.video.stop()
+            pass
+        except: pass
+        try:
+            self.audio.stop()
+        except: pass
+        self.status="stop"
     def Close(self):
         """
         Close media.
         """
-        self.Stop()
+        if self.status !="stop": self.Stop()
         try:
             self.audio.close()
         except: pass
         try:
             self.video.close()
         except: pass
-        self.stream.CLOSE()
-        self.status={"status":"close"}
+        self.ffmpeg.close()
+        self.status="close"
