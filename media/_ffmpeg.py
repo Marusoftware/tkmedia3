@@ -1,7 +1,7 @@
 import av, threading, time, numpy, warnings
 from av import filter
 from  av.audio.fifo import AudioFifo 
-from queue import Full, Queue
+from queue import Full, Queue, Empty
 import av.datasets
 from .exception import MediaFileError
 from .lib import StopWatch
@@ -107,6 +107,7 @@ class Stream():
                     break
                 time.sleep(0.1)
         self.stopwatch.start()
+        self.stopwatch.setTime(point)
     def _loader(self):
         for frame in self.loader["generator"]:
             if self.loader["state"] == "stop":
@@ -129,15 +130,6 @@ class Stream():
                 frames=frame.decode()
             else:
                 frames=[frame]
-            if self.loader["state"] == "seek":
-                if int(frame.loader["seek_to"]) == int(frames[0].time):
-                    self.loader["state"]="load"
-                elif int(frame.loader["seek_to"]) > int(frames[0].time):
-                    self.loader["state"]="load"
-                    continue
-                else:
-                    self.loader["state"]="reload"
-                    break
             for frame in frames:
                 if isinstance(frame, av.audio.AudioFrame):
                     self._audioPreQ.write(frame)
@@ -162,11 +154,9 @@ class Stream():
             self.loader["state"]="stop"
             return
     def seek(self, point):
-        self.loader["seek_to"]=point
-        self.loader["state"]="seek"
-        while self.loader["state"]=="seek":
-            pass
-        return True if self.loader["state"] == "load" else False
+        self.stop()
+        self.clear()
+        self.load(audio=self.loader["audio"], video=self.loader["video"], point=point)#TODO: te, ki, to---
     def clear(self):
         if hasattr(self, "_audioPreQ"):
             self._audioPreQ.read(0)
@@ -174,14 +164,14 @@ class Stream():
             while 1:
                 try:
                     self._audioQ.get_nowait()
-                except:
-                    pass
+                except Empty:
+                    break
         if hasattr(self, "_videoQ"):
             while 1:
                 try:
                     self._videoQ.get_nowait()
-                except:
-                    pass
+                except Empty:
+                    break
     def pause(self):
         self.loader["state"]="pause"
         self.stopwatch.stop()

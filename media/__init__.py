@@ -43,6 +43,7 @@ class Media():
             self.audio.play(device=audioDevice)
         if not video is None:
             self.video.play(frame=videoFrame, frame_type=frame_type)
+        self.play_options={"audioDevice":audioDevice, "videoFrame":videoFrame, "video":video, "audio":audio, "frame_type":frame_type}
         self.status="play"
     def Pause(self):
         """
@@ -69,8 +70,10 @@ class Media():
         """
         Seek media.
         """
-        req_reload=not self.ffmpeg.seek(point)
-        self.status="pause"
+        self.Pause()
+        self.ffmpeg.seek(point)
+        self.Resume()
+        self.status="play"
     def Stop(self):
         """
         Stop media.
