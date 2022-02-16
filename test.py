@@ -1,4 +1,5 @@
 import media, tkinter, tkinter.filedialog as fd, os
+import faulthandler; faulthandler.enable()
 
 def stop():
     a.Pause()
@@ -20,5 +21,6 @@ root.sp=tkinter.Spinbox(root, from_ = 1, to = 10, increment = 1, width = 10)
 root.sp.pack()
 root.b2 = tkinter.Button(text="Seek", command=seek)
 root.b2.pack()
-a.Play(audio=0, video=0, audioDevice="default", videoFrame=l)
+a.Play(audio=None, video=0, audioDevice="default", videoFrame=l)
 root.mainloop()
+a.Close()

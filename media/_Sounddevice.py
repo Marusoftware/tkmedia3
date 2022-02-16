@@ -71,7 +71,6 @@ class Sounddevice():
                         data[:] = datafQ
                     status.output_underflow=False
                     self.last_frametime=frame_time
-                print("\r", gap, end="")
             except queue.Empty:
                 status.output_underflow=True
                 data.fill(0)

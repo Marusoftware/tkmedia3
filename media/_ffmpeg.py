@@ -66,7 +66,7 @@ class Stream():
         elif mode == "w":
             pass
     def load(self, audio=None, video=None, queue_min=None, queue_max=None, wait=True, point=0):
-        self.ffmpeg.seek(point)
+        self.ffmpeg.seek(point, )
         if not queue_min is None:
             self.loader["queue_min"]=queue_min
         if not queue_max is None:
@@ -95,9 +95,9 @@ class Stream():
         if not audio is None and not video is None:
             self.loader["generator"]=self.ffmpeg.demux(audio=audio, video=video)
         elif not audio is None:
-            self.loader["generator"]=self.ffmpeg.decode(self.loadinfo["Astream"])
+            self.loader["generator"]=self.ffmpeg.decode(mux_source[0])
         elif not video is None:
-            self.loader["generator"]=self.ffmpeg.decode(self.loadinfo["Vstream"])
+            self.loader["generator"]=self.ffmpeg.decode(mux_source[0])
         self.loader["state"]="load"
         self.loader["thread"]=threading.Thread(target=self._loader)
         self.loader["thread"].start()
@@ -112,7 +112,9 @@ class Stream():
         for frame in self.loader["generator"]:
             if self.loader["state"] == "stop":
                 break
-            if self._audioQ.qsize() >= self.loader["queue_min"] and self._videoQ.qsize() >= self.loader["queue_min"]:
+            audio=self._audioQ.qsize()>= self.loader["queue_min"] if hasattr(self, "_audioQ")  else True
+            video=self._videoQ.qsize()>= self.loader["queue_min"] if hasattr(self, "_videoQ")  else True
+            if audio and video:
                 self.loader["loaded"]=True
             else:
                 self.loader["loaded"]=False
@@ -132,8 +134,12 @@ class Stream():
                 frames=[frame]
             for frame in frames:
                 if isinstance(frame, av.audio.AudioFrame):
-                    self._audioPreQ.write(frame)
-                    frame=self._audioPreQ.read(self.loader["frame_size"])
+                    try:
+                        self._audioPreQ.write(frame)
+                    except:
+                        pass
+                    else:
+                        frame=self._audioPreQ.read(self.loader["frame_size"])
                     if not frame is None:
                         for processor in self.loader["audio_processor"]:
                             frame=processor(frame)
