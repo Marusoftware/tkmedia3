@@ -65,13 +65,13 @@ class Stream():
             self.loader={"state":"stop", "thread":None, "queue_min":100, "queue_max":300, "audio":None, "video":None, "loaded":False, "audio_processor":[toSdArray], "video_processor":[toImage], "frame_size": 0}
         elif mode == "w":
             pass
-    def load(self, audio=None, video=None, queue_min=None, queue_max=None, wait=True, point=0):
-        self.ffmpeg.seek(point, )
+    def load(self, audio=None, video=None, queue_min=None, queue_max=None, wait=True):
         if not queue_min is None:
             self.loader["queue_min"]=queue_min
         if not queue_max is None:
             self.loader["queue_max"]=queue_max
         mux_source=[]
+        self._oldFrames=[]
         if not audio is None:
             if len(self.info["streams"]["audio"]) == 0:
                 raise MediaFileError("This File doesn't contain audio.")
@@ -93,11 +93,11 @@ class Stream():
         if audio is None and video is None:
             return
         if not audio is None and not video is None:
-            self.loader["generator"]=self.ffmpeg.demux(audio=audio, video=video)
+            self.loader["generator"]=[self.ffmpeg.demux(audio=audio, video=video)]
         elif not audio is None:
-            self.loader["generator"]=self.ffmpeg.decode(mux_source[0])
+            self.loader["generator"]=[self.ffmpeg.decode(mux_source[0])]
         elif not video is None:
-            self.loader["generator"]=self.ffmpeg.decode(mux_source[0])
+            self.loader["generator"]=[self.ffmpeg.decode(mux_source[0])]
         self.loader["state"]="load"
         self.loader["thread"]=threading.Thread(target=self._loader)
         self.loader["thread"].start()
@@ -107,62 +107,81 @@ class Stream():
                     break
                 time.sleep(0.1)
         self.stopwatch.start()
-        self.stopwatch.setTime(point)
     def _loader(self):
-        for frame in self.loader["generator"]:
-            if self.loader["state"] == "stop":
-                break
-            audio=self._audioQ.qsize()>= self.loader["queue_min"] if hasattr(self, "_audioQ")  else True
-            video=self._videoQ.qsize()>= self.loader["queue_min"] if hasattr(self, "_videoQ")  else True
-            if audio and video:
-                self.loader["loaded"]=True
-            else:
-                self.loader["loaded"]=False
-            req=[]
-            while len(req)==0:
-                if self.loader["state"] == "pause":
+        for generator in self.loader["generator"]:
+            for frame in generator:
+                if self.loader["state"] == "stop":
+                    break
+                audio=self._audioQ.qsize()>= self.loader["queue_min"] if hasattr(self, "_audioQ")  else True
+                video=self._videoQ.qsize()>= self.loader["queue_min"] if hasattr(self, "_videoQ")  else True
+                if audio and video:
+                    self.loader["loaded"]=True
+                else:
+                    self.loader["loaded"]=False
+                req=[]
+                while len(req)==0:
+                    if self.loader["state"] == "pause":
+                        time.sleep(0.001)
+                        continue
+                    elif self.loader["state"] == "stop":
+                        break
+                    if not self.loader["audio"] is None and self._audioQ.qsize() < self.loader["queue_min"]:
+                        req.append("a")
+                    if not self.loader["video"] is None and self._videoQ.qsize() < self.loader["queue_min"]:
+                        req.append("v")
                     time.sleep(0.001)
-                    continue
-                if not self.loader["audio"] is None and self._audioQ.qsize() < self.loader["queue_min"]:
-                    req.append("a")
-                if not self.loader["video"] is None and self._videoQ.qsize() < self.loader["queue_min"]:
-                    req.append("v")
-                time.sleep(0.001)
-            if isinstance(frame, av.packet.Packet):
-                frames=frame.decode()
-            else:
-                frames=[frame]
-            for frame in frames:
-                if isinstance(frame, av.audio.AudioFrame):
-                    try:
-                        self._audioPreQ.write(frame)
-                    except:
-                        pass
-                    else:
-                        frame=self._audioPreQ.read(self.loader["frame_size"])
-                    if not frame is None:
-                        for processor in self.loader["audio_processor"]:
+                if isinstance(frame, av.packet.Packet):
+                    frames=frame.decode()
+                else:
+                    frames=[frame]
+                for frame in frames:
+                    if isinstance(frame, av.audio.AudioFrame):
+                        try:
+                            self._audioPreQ.write(frame)
+                        except:
+                            pass
+                        else:
+                            frame=self._audioPreQ.read(self.loader["frame_size"])
+                        if not frame is None:
+                            if not frame in self._oldFrames:
+                                self._oldFrames.append(frame)
+                            for processor in self.loader["audio_processor"]:
+                                frame=processor(frame)
+                            try:
+                                self._audioQ.put_nowait(frame)
+                            except Full:
+                                warnings.warn("Can't put frame to audio queue.(Queue is full)", Warning)
+                    elif isinstance(frame, av.video.VideoFrame):
+                        if not frame in self._oldFrames:
+                            self._oldFrames.append(frame)
+                        for processor in self.loader["video_processor"]:
                             frame=processor(frame)
                         try:
-                            self._audioQ.put_nowait(frame)
+                            self._videoQ.put_nowait(frame)
                         except Full:
-                            warnings.warn("Can't put frame to audio queue.(Queue is full)", Warning)
-                elif isinstance(frame, av.video.VideoFrame):
-                    for processor in self.loader["video_processor"]:
-                        frame=processor(frame)
-                    try:
-                        self._videoQ.put_nowait(frame)
-                    except Full:
-                        warnings.warn("Can't put frame to video queue.(Queue is full)", Warning)
-                else:
-                    warnings.warn("Unknown frame type.", Warning)
-        else:
-            self.loader["state"]="stop"
-            return
+                            warnings.warn("Can't put frame to video queue.(Queue is full)", Warning)
+                    else:
+                        warnings.warn("Unknown frame type.", Warning)
+            else:
+                self.loader["state"]="stop"
+                return
     def seek(self, point):
-        self.stop()
+        self.stop(block=True)
         self.clear()
-        self.load(audio=self.loader["audio"], video=self.loader["video"], point=point)#TODO: te, ki, to---
+        for i, f in enumerate(self._oldFrames):
+            if f.time > point:
+                break
+        self.loader["generator"]=[self._oldFrames[i:], self.loader["generator"][-1]]
+        self.stopwatch.setTime(point)
+        self.loader["state"]="load"
+        self.loader["loaded"]=False
+        self.loader["thread"]=threading.Thread(target=self._loader)
+        self.loader["thread"].start()
+        while True:
+            if self.loader["loaded"]:
+                break
+            time.sleep(0.1)
+        self.stopwatch.start()
     def clear(self):
         if hasattr(self, "_audioPreQ"):
             self._audioPreQ.read(0)
@@ -184,8 +203,9 @@ class Stream():
     def resume(self):
         self.loader["state"]="load"
         self.stopwatch.start()
-    def stop(self):
+    def stop(self, block=True):
         self.loader["state"]="stop"
+        if block: self.loader["thread"].join()
         self.stopwatch.stop()
     def close(self):
         self.stopwatch.stop()

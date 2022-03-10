@@ -33,6 +33,7 @@ class Audio():
         self.sdStream.Pause()
     def resume(self):
         if not self.played: raise WrongOrderError("Not played")
+        self.sdStream.fixDataQueue(self.ffmpeg._audioQ)
         self.sdStream.Resume()
     def stop(self):
         if not self.played: raise WrongOrderError("Not played")

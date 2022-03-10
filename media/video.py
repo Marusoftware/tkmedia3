@@ -25,7 +25,7 @@ class Video():
             try:
                 frame=self.ffmpeg._videoQ.get_nowait()
             except Empty:
-                pass
+                self.frame.after(10, self._play)
             else:
                 info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loader["video"]]
                 sleep_time=1/info["fps"]
