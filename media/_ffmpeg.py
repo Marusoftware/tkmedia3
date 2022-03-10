@@ -15,17 +15,22 @@ def toSdArray(frame):
     return (frame.time, numpy.transpose(frame.to_ndarray()).copy(order='C'))
 
 class Filter():
-    def __init__(self, stream=None, width=None, height=None, format=None, name=None):
+    def __init__(self, stream=None, width=None, height=None, format=None, name=None, audio=False):
         self.filter=filter.Graph()
         self.src=self.filter.add_buffer(template=stream, width=width, height=height, format=format, name=name)
+        self.audio=audio
     def addFilter(self, filter, arg):
         f = self.filter.add(filter=filter, args=arg)
         self.src.link_to(f)
-        f.link_to(self.filter.add("buffersink"))
+        f.link_to(self.filter.add("buffersink"))#thinking...
         self.filter.configure()
     def Process(self, frame):
         self.filter.push(frame=frame)
-        return (frame.index, self.filter.pull())
+        return self.filter.pull()
+    def getFilter(self):
+        pass
+    def availableFilters(self):
+        return av.filter.filters_available
 
 class Stream():
     def __init__(self, path, mode="r", **options):#TODO: write support
