@@ -58,6 +58,9 @@ class Media():
         except: pass
         self.status="pause"
     def Resume(self):
+        """
+        Resume playing.
+        """
         self.ffmpeg.resume()
         try:
             self.video.resume()
