@@ -1,13 +1,12 @@
 from ._Sounddevice import Sounddevice, getDevices, getHostApi, getVersion
-from .lib import StopWatch
 from .exception import WrongOrderError
 
 class Audio():
-    def __init__(self, stream, mode="w", stopwatch=StopWatch(error=True)):
+    def __init__(self, stream, mode="w"):
         self.ffmpeg = stream
         self.mode=mode
         self.played=False
-        self.stopwatch=stopwatch
+        self.stopwatch=self.ffmpeg.stopwatch
     def play(self, channels=2, device=None):
         if not self.ffmpeg.loader["loaded"]: raise WrongOrderError("Stream is not loaded.")
         if self.played:
@@ -26,7 +25,7 @@ class Audio():
         else:
             streamOptions.update(output_device_index=self.device)
         self.streamOptions=streamOptions
-        self.sdStream=Sounddevice(mode=self.mode, dataQueue=self.ffmpeg._audioQ, stopwatch=self.ffmpeg.stopwatch, streamOptions={"samplerate":info["sample_rate"], "blocksize":info["frame_size"], "channels":self.channels, "device":self.device})
+        self.sdStream=Sounddevice(mode=self.mode, dataQueue=self.ffmpeg._audioQ, stopwatch=self.stopwatch, streamOptions={"samplerate":info["sample_rate"], "blocksize":info["frame_size"], "channels":self.channels, "device":self.device})
         self.played=True
         self.sdStream.Play()
     def pause(self):
@@ -34,6 +33,7 @@ class Audio():
         self.sdStream.Pause()
     def resume(self):
         if not self.played: raise WrongOrderError("Not played")
+        self.sdStream.fixDataQueue(self.ffmpeg._audioQ)
         self.sdStream.Resume()
     def stop(self):
         if not self.played: raise WrongOrderError("Not played")

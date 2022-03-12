@@ -34,6 +34,14 @@ class Sounddevice():
         self.state="stop"
         self.stopwatch=stopwatch
         self.last_frametime=0
+    def fixDataQueue(self, dataQueue=None):
+        if dataQueue is None:
+            if self.mode == "rw":
+                self.dataQueue = (queue.Queue(), queue.Queue())
+            else:
+                self.dataQueue = queue.Queue()
+        else:
+            self.dataQueue=dataQueue
     def Record(self):
         if self.mode == "w": raise ModeError("Can't record in write Mode.")
         if self.mode == "rw" and self.state == "play": self.state = "both"
@@ -59,9 +67,11 @@ class Sounddevice():
         if self.state == "play":
             try:
                 gap=self.stopwatch.getTime()-self.last_frametime
-                border=1
+                border=0.5
                 if gap<float(0):
+                    print("minus", self.stopwatch.getTime(), self.last_frametime)
                     data.fill(0)
+                    self.last_frametime=self.stopwatch.getTime()
                 else:
                     frame_time, datafQ=self.dataQueue.get_nowait()
                     if gap>float(border):
@@ -71,8 +81,8 @@ class Sounddevice():
                         data[:] = datafQ
                     status.output_underflow=False
                     self.last_frametime=frame_time
-                print("\r", gap, end="")
             except queue.Empty:
+                print("empty", self.dataQueue)
                 status.output_underflow=True
                 data.fill(0)
         elif self.state == "rec":

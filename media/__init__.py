@@ -1,8 +1,8 @@
 from .audio import Audio
 from .video import Video
 from .picture import Picture
-from .exception import MediaFileError
-from ._ffmpeg import Stream, Filter, time
+from .exception import MediaFileError, ModeError, WrongOrderError
+from ._ffmpeg import Stream, Filter
 from .lib import StopWatch
 
 __version__="0.1.0"
@@ -43,6 +43,7 @@ class Media():
             self.audio.play(device=audioDevice)
         if not video is None:
             self.video.play(frame=videoFrame, frame_type=frame_type)
+        self.play_options={"audioDevice":audioDevice, "videoFrame":videoFrame, "video":video, "audio":audio, "frame_type":frame_type}
         self.status="play"
     def Pause(self):
         """
@@ -57,6 +58,9 @@ class Media():
         except: pass
         self.status="pause"
     def Resume(self):
+        """
+        Resume playing.
+        """
         self.ffmpeg.resume()
         try:
             self.video.resume()
@@ -69,8 +73,10 @@ class Media():
         """
         Seek media.
         """
-        req_reload=not self.ffmpeg.seek(point)
-        self.status="pause"
+        self.Pause()
+        self.ffmpeg.seek(point)
+        self.Resume()
+        self.status="play"
     def Stop(self):
         """
         Stop media.
