@@ -5,8 +5,8 @@ from .exception import MediaFileError, ModeError, WrongOrderError
 from ._ffmpeg import Stream, Filter
 from .lib import StopWatch
 
-__version__="0.1.0"
-__license__="MIT License with Marusoftware License"
+__version__="0.1.1"
+__license__="MIT License"
 __author__="Marusoftware"
 __author_email__="marusoftware@outlook.jp"
 __url__="https://marusoftware.net"
@@ -49,6 +49,7 @@ class Media():
         """
         Pause playing.
         """
+        if self.status != "play": raise WrongOrderError("Media is not playing.")
         self.ffmpeg.pause()
         try:
             self.video.pause()
@@ -61,6 +62,7 @@ class Media():
         """
         Resume playing.
         """
+        if self.status != "pause": raise WrongOrderError("Media is not paused.")
         self.ffmpeg.resume()
         try:
             self.video.resume()

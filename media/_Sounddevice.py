@@ -69,7 +69,7 @@ class Sounddevice():
                 gap=self.stopwatch.getTime()-self.last_frametime
                 border=0.5
                 if gap<float(0):
-                    print("minus", self.stopwatch.getTime(), self.last_frametime)
+                    print("\r minus", self.stopwatch.getTime(), self.last_frametime, end="")
                     data.fill(0)
                     self.last_frametime=self.stopwatch.getTime()
                 else:
@@ -82,7 +82,7 @@ class Sounddevice():
                     status.output_underflow=False
                     self.last_frametime=frame_time
             except queue.Empty:
-                print("empty", self.dataQueue)
+                print("\r empty", self.dataQueue, end="")
                 status.output_underflow=True
                 data.fill(0)
         elif self.state == "rec":
