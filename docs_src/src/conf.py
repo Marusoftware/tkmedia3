@@ -33,7 +33,6 @@ release = '0.0.2'
 import sphinx_rtd_theme
 extensions = [
     "sphinx_rtd_theme",
-    "sphinx.ext.githubpages",
     "sphinxcontrib.blockdiag",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
