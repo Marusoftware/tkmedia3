@@ -10,9 +10,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../../'))
 
 
 # -- Project information -----------------------------------------------------
@@ -34,7 +34,10 @@ import sphinx_rtd_theme
 extensions = [
     "sphinx_rtd_theme",
     "sphinx.ext.githubpages",
-    "sphinxcontrib.blockdiag"
+    "sphinxcontrib.blockdiag",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx_multiversion"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -60,3 +63,5 @@ html_static_path = ['_static']
 
 # Fontpath for blockdiag (truetype font)
 blockdiag_fontpath = '/usr/share/fonts/truetype/ipafont/ipagp.ttf'
+
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
