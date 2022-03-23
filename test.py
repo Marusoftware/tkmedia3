@@ -1,5 +1,7 @@
 import media, tkinter, tkinter.filedialog as fd, os
 import faulthandler; faulthandler.enable()
+import logging
+logging.basicConfig()
 
 def stop():
     a.Pause()
