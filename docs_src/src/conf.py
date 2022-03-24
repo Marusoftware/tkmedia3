@@ -35,6 +35,7 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinxcontrib.blockdiag",
     "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
     "sphinx.ext.intersphinx",
     "sphinx_multiversion"
 ]
@@ -64,3 +65,9 @@ html_static_path = ['_static']
 blockdiag_fontpath = '/usr/share/fonts/truetype/ipafont/ipagp.ttf'
 
 intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
+
+smv_tag_whitelist = r'^\d+\.\d+\.\d+$'
+smv_remote_whitelist = None
+smv_branch_whitelist = r'^.*$'
+smv_outputdir_format = '{ref.name}'
+#smv_remote_whitelist = r'^origin$'
