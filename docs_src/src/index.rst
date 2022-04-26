@@ -1,8 +1,12 @@
-media package
-=============
+tkmedia
+=======
 
-Submodules
-----------
+Welcome to tkmedia's document!
+
+.. automodule:: media
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 media.audio module
 ------------------
