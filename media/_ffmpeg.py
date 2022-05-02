@@ -1,5 +1,5 @@
 import av, threading, time, numpy, warnings
-from av import filter
+from av.filter import Graph
 from  av.audio.fifo import AudioFifo 
 from queue import Full, Queue, Empty
 import av.datasets
@@ -16,7 +16,7 @@ def toSdArray(frame):
 
 class Filter():
     def __init__(self, stream=None, width=None, height=None, format=None, name=None, audio=False):
-        self.filter=filter.Graph()
+        self.filter=Graph()
         self.src=self.filter.add_buffer(template=stream, width=width, height=height, format=format, name=name)
         self.audio=audio
     def addFilter(self, filter, arg):
