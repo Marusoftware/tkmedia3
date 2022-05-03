@@ -2,7 +2,7 @@ from .audio import Audio
 from .video import Video
 from .picture import Picture
 from .exception import MediaFileError, ModeError, WrongOrderError
-from ._ffmpeg import Stream, Filter
+from ._ffmpeg import Stream, AudioFilter, VideoFilter
 from .lib import StopWatch
 
 __version__="0.1.1"
