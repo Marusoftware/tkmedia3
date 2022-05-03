@@ -11,7 +11,7 @@ see [docs](https://marusoftware.github.io/tkmedia3/master/index.html)(in progres
 (Hmm...? "No one decent material"..? Yeah...I see... It's sorry, I'll do it...)
 
 ## Install
-Stable release:
-`pip install tkmedia`
-Dev:
-`pip install git+https://github.com/Marusoftware/tkmedia3.git`(not tested)
+Stable release:   
+`pip install tkmedia`   
+Dev:   
+`pip install git+https://github.com/Marusoftware/tkmedia3.git`(not tested)   
