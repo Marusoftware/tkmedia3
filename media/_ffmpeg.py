@@ -51,7 +51,7 @@ class VideoFilter():
 class Stream():
     def __init__(self, path, mode="r", **options):#TODO: write support
         self.stopwatch=StopWatch(error=False)
-        self.ffmpeg = av.open(av.datasets.curated(path), mode=mode, **options)
+        self.ffmpeg = av.open(path, mode=mode, **options)
         self.info = {
             "codec_name" : self.ffmpeg.format.name.split(","),
             "codec_long" : self.ffmpeg.format.long_name,
