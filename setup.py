@@ -12,7 +12,7 @@ with open(path.join(root_dir, 'README.md'), "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="tkmedia",
-    version="0.1.1",
+    version="0.1.2",
     author="Marusoftware",
     author_email="marusoftware@outlook.jp",
     description="Tkinter Media Support.",

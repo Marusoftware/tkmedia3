@@ -5,7 +5,7 @@ from .exception import MediaFileError, ModeError, WrongOrderError
 from ._ffmpeg import Stream, AudioFilter, VideoFilter
 from .lib import StopWatch
 
-__version__="0.1.1"
+__version__="0.1.2"
 __license__="MIT License"
 __author__="Marusoftware"
 __author_email__="marusoftware@outlook.jp"
