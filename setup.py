@@ -7,7 +7,7 @@ root_dir = path.abspath(path.dirname(__file__))
 def _requirements():
     return [name.rstrip() for name in open(path.join(root_dir, 'requirements.txt')).readlines()]
 
-with open(path.join(root_dir, 'requirements.txt'), "r", encoding="utf-8") as fh:
+with open(path.join(root_dir, 'README.md'), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
