@@ -1,3 +1,22 @@
+[tool.poetry]
+name = "tkmedia"
+version = "0.1.2"
+description = "Tkinter Media Support."
+authors = ["Maruo.S <raspi-maru2004@outlook.jp>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    {include = "media"}
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+av = "^9.2.0"
+numpy = "^1.23.4"
+Pillow = "^9.2.0"
+sounddevice = "^0.4.5"
+
+
 [build-system]
-requires = ["setuptools>=42"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
