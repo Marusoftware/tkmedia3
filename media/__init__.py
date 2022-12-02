@@ -35,7 +35,7 @@ class Media():
         video(int): video stream number
         audio(int): audio stream number
         """
-        self.ffmpeg.load(audio=audio, video=video, wait=True)
+        self.ffmpeg.load(audio=audio, video=video, block=True)
         if not video is None:
             self.video=Video(self.ffmpeg, mode="w")
         if not audio is None:

@@ -1,8 +1,7 @@
 import av, threading, time, numpy, warnings
 from av.filter import Graph
-from  av.audio.fifo import AudioFifo 
+from av.audio.fifo import AudioFifo 
 from queue import Full, Queue, Empty
-import av.datasets
 from .exception import MediaFileError
 from .lib import StopWatch
 
@@ -86,19 +85,21 @@ class Stream():
             self.loader={"state":"stop", "thread":None, "queue_min":100, "queue_max":300, "audio":None, "video":None, "loaded":False, "audio_processor":[toSdArray], "video_processor":[toImage], "frame_size": 0}
         elif mode == "w":
             pass
-    def load(self, audio=None, video=None, queue_min=None, queue_max=None, wait=True):
+    def load(self, audio=None, video=None, queue_min=None, queue_max=None, block=True):
+        if audio is None and video is None:
+            return
         if not queue_min is None:
             self.loader["queue_min"]=queue_min
         if not queue_max is None:
             self.loader["queue_max"]=queue_max
+        self.loader["audio"]=audio
+        self.loader["video"]=video
         mux_source=[]
-        self._oldFrames=[]
         if not audio is None:
             if len(self.info["streams"]["audio"]) == 0:
                 raise MediaFileError("This File doesn't contain audio.")
             if len(self.info["streams"]["audio"]) < audio:
                 raise MediaFileError(f"Audio stream '{audio}' is not exists.")
-            self.loader["audio"]=audio
             self._audioPreQ=AudioFifo()
             self._audioQ=Queue(maxsize=self.loader["queue_max"])
             self.loader["frame_size"]=self.info["streams"]["audio"][audio]["frame_size"]
@@ -108,102 +109,95 @@ class Stream():
                 raise MediaFileError("This File doesn't contain video.")
             if len(self.info["streams"]["video"]) < video:
                 raise MediaFileError(f"Video stream '{video}' is not exists.")
-            self.loader["video"]=video
             self._videoQ=Queue(maxsize=self.loader["queue_max"])
             mux_source.append(self.streams.get(video=video))
-        if audio is None and video is None:
-            return
         if not audio is None and not video is None:
-            self.loader["generator"]=[self.ffmpeg.demux(audio=audio, video=video)]
+            self.loader["generator"]=self.ffmpeg.demux(audio=audio, video=video)
         elif not audio is None:
-            self.loader["generator"]=[self.ffmpeg.decode(mux_source[0])]
+            self.loader["generator"]=self.ffmpeg.decode(mux_source[0])
         elif not video is None:
-            self.loader["generator"]=[self.ffmpeg.decode(mux_source[0])]
+            self.loader["generator"]=self.ffmpeg.decode(mux_source[0])
+        del mux_source
         self.loader["state"]="load"
         self.loader["thread"]=threading.Thread(target=self._loader)
         self.loader["thread"].start()
-        if wait:
-            while True:
-                if self.loader["loaded"]:
-                    break
-                time.sleep(0.1)
-        self.stopwatch.start()
-    def _loader(self):
-        for generator in self.loader["generator"]:
-            for frame in generator:
-                if self.loader["state"] == "stop":
-                    break
-                audio=self._audioQ.qsize()>= self.loader["queue_min"] if hasattr(self, "_audioQ")  else True
-                video=self._videoQ.qsize()>= self.loader["queue_min"] if hasattr(self, "_videoQ")  else True
-                if audio and video:
-                    self.loader["loaded"]=True
-                else:
-                    self.loader["loaded"]=False
-                req=[]
-                while len(req)==0:
-                    if self.loader["state"] == "pause":
-                        time.sleep(0.001)
-                        continue
-                    elif self.loader["state"] == "stop":
-                        break
-                    if not self.loader["audio"] is None and self._audioQ.qsize() < self.loader["queue_min"]:
-                        req.append("a")
-                    if not self.loader["video"] is None and self._videoQ.qsize() < self.loader["queue_min"]:
-                        req.append("v")
-                    time.sleep(0.001)
-                if isinstance(frame, av.packet.Packet):
-                    frames=frame.decode()
-                else:
-                    frames=[frame]
-                for frame in frames:
-                    if isinstance(frame, av.audio.AudioFrame):
-                        try:
-                            self._audioPreQ.write(frame)
-                        except:
-                            pass
-                        else:
-                            frame=self._audioPreQ.read(self.loader["frame_size"])
-                        if not frame is None:
-                            if not frame in self._oldFrames:
-                                self._oldFrames.append(frame)
-                            for processor in self.loader["audio_processor"]:
-                                frame=processor(frame)
-                            try:
-                                self._audioQ.put_nowait(frame)
-                            except Full:
-                                warnings.warn("Can't put frame to audio queue.(Queue is full)", Warning)
-                    elif isinstance(frame, av.video.VideoFrame):
-                        if not frame in self._oldFrames:
-                            self._oldFrames.append(frame)
-                        for processor in self.loader["video_processor"]:
-                            frame=processor(frame)
-                        try:
-                            self._videoQ.put_nowait(frame)
-                        except Full:
-                            warnings.warn("Can't put frame to video queue.(Queue is full)", Warning)
-                    else:
-                        warnings.warn("Unknown frame type.", Warning)
-            else:
-                self.loader["state"]="stop"
-                return
-    def seek(self, point):
-        self.stop(block=True)
-        self.clear()
-        for i, f in enumerate(self._oldFrames):
-            if f.time > point:
-                break
-        self.loader["generator"]=[self._oldFrames[i:], self.loader["generator"][-1]]
-        self.stopwatch.setTime(point)
-        self.loader["state"]="load"
-        self.loader["loaded"]=False
-        self.loader["thread"]=threading.Thread(target=self._loader)
-        self.loader["thread"].start()
-        while True:
-            if self.loader["loaded"]:
-                break
+        while block and not self.loader["loaded"]:
             time.sleep(0.1)
         self.stopwatch.start()
+    def _loader(self):
+        for frame in self.loader["generator"]:
+            if self.loader["state"] == "stop":
+                break
+            elif self.loader["state"] == "pause":
+                time.sleep(0.001)
+                continue
+            audio=self._audioQ.qsize() if hasattr(self, "_audioQ")  else self.loader["queue_max"]
+            video=self._videoQ.qsize()if hasattr(self, "_videoQ")  else self.loader["queue_max"]
+            if min((audio, video)) >= self.loader["queue_min"]:
+                self.loader["loaded"]=True
+            else:
+                self.loader["loaded"]=False
+            if max((audio, video)) >= self.loader["queue_max"]:
+                time.sleep(0.001)
+                continue
+            if isinstance(frame, av.packet.Packet):
+                frames=frame.decode()
+            else:
+                frames=[frame]
+            for frame in frames:
+                if isinstance(frame, av.audio.AudioFrame):
+                    try:
+                        self._audioPreQ.write(frame)
+                    except:
+                        pass
+                    else:
+                        frame=self._audioPreQ.read(self.loader["frame_size"])
+                    if not frame is None:
+                        if not frame in self._oldFrames:
+                            self._oldFrames.append(frame)
+                        for processor in self.loader["audio_processor"]:
+                            frame=processor(frame)
+                        try:
+                            self._audioQ.put_nowait(frame)
+                        except Full:
+                            warnings.warn("Can't put frame to audio queue.(Queue is full)", Warning)
+                elif isinstance(frame, av.video.VideoFrame):
+                    if not frame in self._oldFrames:
+                        self._oldFrames.append(frame)
+                    for processor in self.loader["video_processor"]:
+                        frame=processor(frame)
+                    try:
+                        self._videoQ.put_nowait(frame)
+                    except Full:
+                        warnings.warn("Can't put frame to video queue.(Queue is full)", Warning)
+                else:
+                    warnings.warn("Unknown frame type.", Warning)
+            del frame, frames
+        else:
+            self.loader["state"]="stop"
+            return
+    def seek(self, point, block=True):
+        if point >= self.stopwatch.getTime():
+            self.stopwatch.setTime(point)
+            return
+        else:
+            self.pause()
+            self.clear()
+            self.ffmpeg.seek(point)
+            if self.loader["audio"] is not None and self.loader["video"] is not None:
+                self.loader["generator"]=self.ffmpeg.demux(audio=self.loader["audio"], video=self.loader["video"])
+            elif not self.loader["audio"] is None:
+                self.loader["generator"]=self.ffmpeg.decode(audio=self.loader["audio"])
+            elif not self.loader["video"] is None:
+                self.loader["generator"]=self.ffmpeg.decode(video=self.loader["video"])
+            self.stopwatch.setTime(point)
+            self.resume()
+            while block:
+                if self.loader["loaded"]:
+                    break
+        self.stopwatch.start()
     def clear(self):
+        del self.loader["generator"]
         if hasattr(self, "_audioPreQ"):
             self._audioPreQ.read(0)
         if hasattr(self, "_audioQ"):
