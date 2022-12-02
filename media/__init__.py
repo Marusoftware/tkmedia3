@@ -1,3 +1,4 @@
+from typing import Literal
 from .audio import Audio
 from .video import Video
 from .picture import Picture
@@ -13,7 +14,7 @@ __url__="https://marusoftware.net"
 __all__=["Video", "Audio", "Picture", "Media", "Filter"]
 
 class Media():
-    def __init__(self, url, mode="r", **options):
+    def __init__(self, url:str, mode:Literal["r", "w"]="r", **options):
         """
         Initialize media library.
         url(str or file-like object): Media file url. This will pass to ffmpeg.
@@ -25,7 +26,7 @@ class Media():
         self.ffmpegs=self.ffmpeg.streams
         self.stopwatch=self.ffmpeg.stopwatch
         self.status="pause"
-    def Play(self, audioDevice=None, videoFrame=None, video=None, audio=None, frame_type="label"):
+    def Play(self, audioDevice:int=None, videoFrame:int=None, video:int=None, audio:int=None, frame_type:Literal["label", "canvas"]="label"):
         """
         Play media.
         audioDevice(int): An number of Device(You can get with media.audio.getDevices func)
@@ -71,9 +72,10 @@ class Media():
             self.audio.resume()
         except: pass
         self.status="play"
-    def Seek(self, point):
+    def Seek(self, point:int):
         """
         Seek media.
+        point(int): time/s to seek
         """
         self.Pause()
         self.ffmpeg.seek(point)
