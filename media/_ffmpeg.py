@@ -153,8 +153,6 @@ class Stream():
                     else:
                         frame=self._audioPreQ.read(self.loader["frame_size"])
                     if not frame is None:
-                        if not frame in self._oldFrames:
-                            self._oldFrames.append(frame)
                         for processor in self.loader["audio_processor"]:
                             frame=processor(frame)
                         try:
@@ -162,8 +160,6 @@ class Stream():
                         except Full:
                             warnings.warn("Can't put frame to audio queue.(Queue is full)", Warning)
                 elif isinstance(frame, av.video.VideoFrame):
-                    if not frame in self._oldFrames:
-                        self._oldFrames.append(frame)
                     for processor in self.loader["video_processor"]:
                         frame=processor(frame)
                     try:
