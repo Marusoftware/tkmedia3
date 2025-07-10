@@ -1,3 +1,4 @@
+from typing import Literal
 import av, threading, time, numpy, warnings
 from av.filter import Graph
 from av.audio.fifo import AudioFifo 
@@ -48,7 +49,7 @@ class VideoFilter():
         return av.filter.filters_available
 
 class Stream():
-    def __init__(self, path, mode="r", **options):#TODO: write support
+    def __init__(self, path, mode:Literal["r", "w"]="r", **options):#TODO: write support
         self.stopwatch=StopWatch(error=False)
         self.ffmpeg = av.open(path, mode=mode, **options)
         self.info = {
@@ -131,27 +132,31 @@ class Stream():
             elif self.loader["state"] == "pause":
                 time.sleep(0.001)
                 continue
-            audio=self._audioQ.qsize() if hasattr(self, "_audioQ")  else self.loader["queue_max"]
-            video=self._videoQ.qsize()if hasattr(self, "_videoQ")  else self.loader["queue_max"]
+            audio = self._audioQ.qsize() if hasattr(self, "_audioQ")  else self.loader["queue_max"]
+            video = self._videoQ.qsize()if hasattr(self, "_videoQ")  else self.loader["queue_max"]
+            while max((audio, video)) >= self.loader["queue_max"]:
+                audio=self._audioQ.qsize() if hasattr(self, "_audioQ")  else self.loader["queue_max"]
+                video=self._videoQ.qsize()if hasattr(self, "_videoQ")  else self.loader["queue_max"]
+                time.sleep(0.001)
             if min((audio, video)) >= self.loader["queue_min"]:
                 self.loader["loaded"]=True
             else:
                 self.loader["loaded"]=False
-            if max((audio, video)) >= self.loader["queue_max"]:
-                time.sleep(0.001)
-                continue
-            if isinstance(frame, av.packet.Packet):
+            if isinstance(frame, av.Packet):
                 frames=frame.decode()
+                frames.reverse()
             else:
                 frames=[frame]
             for frame in frames:
-                if isinstance(frame, av.audio.AudioFrame):
-                    try:
-                        self._audioPreQ.write(frame)
-                    except:
-                        pass
-                    else:
-                        frame=self._audioPreQ.read(self.loader["frame_size"])
+                if isinstance(frame, av.AudioFrame):
+                    # try:
+                    #     self._audioPreQ.write(frame)
+                    # except:
+                    #     import traceback
+                    #     traceback.print_exc()
+                    #     raise
+                    # else:
+                    #     frame=self._audioPreQ.read(self.loader["frame_size"])
                     if not frame is None:
                         for processor in self.loader["audio_processor"]:
                             frame=processor(frame)
@@ -159,7 +164,9 @@ class Stream():
                             self._audioQ.put_nowait(frame)
                         except Full:
                             warnings.warn("Can't put frame to audio queue.(Queue is full)", Warning)
-                elif isinstance(frame, av.video.VideoFrame):
+                    else:
+                        warnings.warn("frame is none...")
+                elif isinstance(frame, av.VideoFrame):
                     for processor in self.loader["video_processor"]:
                         frame=processor(frame)
                     try:

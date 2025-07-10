@@ -11,10 +11,10 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.9"
-av = "^11.0.0"
+av = "^15.0.0"
 numpy = "^1.26.3"
 Pillow = "^10.2.0"
-sounddevice = "^0.4.6"
+sounddevice = "^0.5.2"
 
 
 [build-system]

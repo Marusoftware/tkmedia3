@@ -67,20 +67,26 @@ class Sounddevice():
         if self.state == "play":
             try:
                 gap=self.stopwatch.getTime()-self.last_frametime
-                border=0.5
-                if gap<float(0):
-                    print("\r minus", self.stopwatch.getTime(), self.last_frametime, end="")
+                border=1.0
+                if gap<float(border)*-1:
+                    last_frametime=self.stopwatch.getTime()
+                    print("\r minus", last_frametime, self.last_frametime, end="")
                     data.fill(0)
-                    self.last_frametime=self.stopwatch.getTime()
-                else:
+                    status.output_underflow=True
+                    self.last_frametime=last_frametime
+                    return
+                #     # 
+                # else:
+                frame_time, datafQ=self.dataQueue.get_nowait()
+                if gap>float(border):
                     frame_time, datafQ=self.dataQueue.get_nowait()
-                    if gap>float(border):
-                        frame_time, datafQ=self.dataQueue.get_nowait()
-                        data[:] = datafQ
-                    else:
-                        data[:] = datafQ
-                    status.output_underflow=False
-                    self.last_frametime=frame_time
+                    # data[:] = datafQ
+                # else:
+                    # print("\r",len(datafQ), len(data), end="")
+                data[:] = datafQ
+                # print("\r", frame_time, end="")
+                status.output_underflow=False
+                self.last_frametime=frame_time
             except queue.Empty:
                 print("\r empty", self.dataQueue, end="")
                 status.output_underflow=True
