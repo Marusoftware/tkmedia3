@@ -1,0 +1,47 @@
+name: Build docs for GitHub Pages
+
+on:
+  push:
+    branches:
+      - master
+  #pull_request:
+
+jobs:
+  build:
+    runs-on:
+      - self-hosted
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build
+        id: build
+        run: |
+          rm -rf .venv
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install pdoc3 httpx attrs poetry 
+          poetry config virtualenvs.create false
+          poetry install --no-interaction
+          pdoc --html --output-dir tmp --force media/
+          tar -C tmp/media/ -cvf ./tmp.tar ./
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: ./tmp.tar
+          if-no-files-found: error
+          retention-days: 1
+  deploy:
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+    environment:
+      name: github-pages
+    runs-on:
+      - self-hosted
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

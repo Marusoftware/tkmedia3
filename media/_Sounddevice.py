@@ -12,6 +12,7 @@ def getHostApi(index=None):
 class Sounddevice():
     def __init__(self, mode, streamOptions={}, dataQueue=None, rw_autoStop=True, stopwatch=StopWatch(error=False)):
         self.mode = mode
+        #streamOptions["latency"]=0.0
         if self.mode=="rw":
             if not "callback" in streamOptions: streamOptions.update(callback=self._Queue2)
             self.sdStream= sounddevice.Stream(dtype="float32", **streamOptions)

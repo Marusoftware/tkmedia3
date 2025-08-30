@@ -1,6 +1,7 @@
 from typing import Literal
+import av
 import av, threading, time, numpy, warnings
-from av.filter import Graph
+from av.filter import Graph, filters_available
 from av.audio.fifo import AudioFifo 
 from queue import Full, Queue, Empty
 from .exception import MediaFileError
@@ -12,7 +13,7 @@ def toImage(frame):
     except:
         return (frame.time, frame.to_rgb().to_image())
 def toSdArray(frame):
-    return (frame.time, numpy.transpose(frame.to_ndarray()).copy(order='C'))
+    return (frame.time, numpy.transpose(frame.to_ndarray()[:2]).copy(order='C'))
 
 class AudioFilter():
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):
@@ -29,7 +30,7 @@ class AudioFilter():
     def getFilter(self):
         pass
     def availableFilters(self):
-        return av.filter.filters_available
+        return filters_available
 
 class VideoFilter():
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):
@@ -46,7 +47,7 @@ class VideoFilter():
     def getFilter(self):
         pass
     def availableFilters(self):
-        return av.filter.filters_available
+        return filters_available
 
 class Stream():
     def __init__(self, path, mode:Literal["r", "w"]="r", **options):#TODO: write support
