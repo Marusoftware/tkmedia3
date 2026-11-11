@@ -78,6 +78,8 @@ class Media():
         point(int): time/s to seek
         """
         self.Pause()
+        if hasattr(self, "video"):
+            self.video.reset()
         self.ffmpeg.seek(point)
         self.Resume()
         self.status="play"
