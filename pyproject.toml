@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tkmedia"
-version = "0.1.2"
+version = "0.1.3"
 description = "Tkinter Media Support."
 authors = ["Maruo.S <raspi-maru2004@outlook.jp>"]
 license = "MIT"
