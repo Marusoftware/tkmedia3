@@ -12,8 +12,13 @@ def toImage(frame):
         return (frame.time, frame.to_image())
     except:
         return (frame.time, frame.to_rgb().to_image())
-def toSdArray(frame):
-    return (frame.time, numpy.transpose(frame.to_ndarray()[:2]).copy(order='C'))
+def toSdArray(frame, layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo"):
+    # Normalize packed/planar and integer/float input, and downmix using the
+    # channel layout so that center and surround audio reach stereo output.
+    resampler = av.AudioResampler(format="flt", layout=layout, rate=frame.sample_rate)
+    converted = resampler.resample(frame)[0]
+    channels = len(converted.layout.channels)
+    return (frame.time, converted.to_ndarray().reshape(-1, channels).copy(order='C'))
 
 class AudioFilter():
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):
@@ -85,15 +90,21 @@ class Stream():
                 "other" : _stream_info(self.streams.other)
             })
             self.loader={"state":"stop", "thread":None, "queue_min":100, "queue_max":300, "audio":None, "video":None, "loaded":False, "audio_processor":[toSdArray], "video_processor":[toImage], "frame_size": 0}
+            self.loader["audio_layout"] = "stereo"
+            self.loader["audio_processor"] = [self._convert_audio]
             self._loader_stop = threading.Event()
             self._buffer_ready = threading.Event()
             self._loader_error = None
             self._seek_point = None
         elif mode == "w":
             pass
-    def load(self, audio=None, video=None, queue_min=None, queue_max=None, block=True):
+    def _convert_audio(self, frame):
+        return toSdArray(frame, layout=self.loader["audio_layout"])
+    def load(self, audio=None, video=None, queue_min=None, queue_max=None, block=True,
+             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo"):
         if audio is None and video is None:
             return
+        self.loader["audio_layout"] = av.AudioLayout(audio_layout).name
         if not queue_min is None:
             self.loader["queue_min"]=queue_min
         if not queue_max is None:

@@ -1,5 +1,6 @@
 from ._Sounddevice import Sounddevice, getDevices, getHostApi, getVersion
 from .exception import WrongOrderError
+import av
 
 class Audio():
     def __init__(self, stream, mode="w"):
@@ -7,12 +8,15 @@ class Audio():
         self.mode=mode
         self.played=False
         self.stopwatch=self.ffmpeg.stopwatch
-    def play(self, channels=2, device=None):
+    def play(self, channels=None, device=None):
         if not self.ffmpeg.loader["loaded"]: raise WrongOrderError("Stream is not loaded.")
+        output_channels = len(av.AudioLayout(self.ffmpeg.loader.get("audio_layout", "stereo")).channels)
+        if channels is not None and channels != output_channels:
+            raise ValueError("channels must match the audio_layout selected when loading the stream")
         if self.played:
             self.sdStream.Stop()
         info=self.ffmpeg.info["streams"]["audio"][self.ffmpeg.loader["audio"]]
-        self.channels=channels
+        self.channels=output_channels
         self.device=device
         streamOptions={"frames_per_buffer":info["frame_size"]}
         if self.mode == "rw":

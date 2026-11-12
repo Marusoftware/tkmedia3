@@ -26,7 +26,8 @@ class Media():
         self.stopwatch=self.ffmpeg.stopwatch
         self.status="pause"
     def play(self, audioDevice:Optional[int]=None, videoFrame:Optional[int]=None, video:Optional[int]=None,
-             audio:Optional[int]=None, frame_type:Literal["label", "canvas"]="label"):
+             audio:Optional[int]=None, frame_type:Literal["label", "canvas"]="label",
+             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo"):
         """
         Play media.
         audioDevice(int): An number of Device(You can get with media.audio.getDevices func)
@@ -34,8 +35,9 @@ class Media():
         frame_type(str): videoFrame type(Label->label, Canvas->canvas)
         video(int): video stream number
         audio(int): audio stream number
+        audio_layout(str): Output channel layout, e.g. 'mono', 'stereo', or '5.1'.
         """
-        self.ffmpeg.load(audio=audio, video=video, block=True)
+        self.ffmpeg.load(audio=audio, video=video, block=True, audio_layout=audio_layout)
         if not video is None:
             self.video=Video(self.ffmpeg, mode="w")
         if not audio is None:
@@ -44,7 +46,7 @@ class Media():
             self.audio.play(device=audioDevice)
         if not video is None:
             self.video.play(frame=videoFrame, frame_type=frame_type)
-        self.play_options={"audioDevice":audioDevice, "videoFrame":videoFrame, "video":video, "audio":audio, "frame_type":frame_type}
+        self.play_options={"audioDevice":audioDevice, "videoFrame":videoFrame, "video":video, "audio":audio, "frame_type":frame_type, "audio_layout":audio_layout}
         self.status="play"
     def pause(self):
         """

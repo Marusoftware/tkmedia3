@@ -35,7 +35,11 @@ class Sounddevice():
         self.state="stop"
         self.stopwatch=stopwatch
         self.last_frametime=0
+        self._pending_audio=None
+        self._pending_offset=0
     def fixDataQueue(self, dataQueue=None):
+        self._pending_audio=None
+        self._pending_offset=0
         if dataQueue is None:
             if self.mode == "rw":
                 self.dataQueue = (queue.Queue(), queue.Queue())
@@ -66,32 +70,35 @@ class Sounddevice():
         self.sdStream.close()
     def _Queue(self, data, frames, time, status):
         if self.state == "play":
+            data.fill(0)
             try:
                 gap=self.stopwatch.getTime()-self.last_frametime
                 border=1.0
                 if gap<float(border)*-1:
                     last_frametime=self.stopwatch.getTime()
-                    print("\r minus", last_frametime, self.last_frametime, end="")
-                    data.fill(0)
                     status.output_underflow=True
                     self.last_frametime=last_frametime
                     return
-                #     # 
-                # else:
-                frame_time, datafQ=self.dataQueue.get_nowait()
-                if gap>float(border):
-                    frame_time, datafQ=self.dataQueue.get_nowait()
-                    # data[:] = datafQ
-                # else:
-                    # print("\r",len(datafQ), len(data), end="")
-                data[:] = datafQ
-                # print("\r", frame_time, end="")
+                written = 0
+                while written < frames:
+                    if self._pending_audio is None:
+                        self._pending_audio = self.dataQueue.get_nowait()
+                        self._pending_offset = 0
+                        if gap > border:
+                            self._pending_audio = None
+                            self._pending_audio = self.dataQueue.get_nowait()
+                        gap = 0
+                    frame_time, samples = self._pending_audio
+                    count = min(frames - written, len(samples) - self._pending_offset)
+                    data[written:written + count] = samples[self._pending_offset:self._pending_offset + count]
+                    written += count
+                    self._pending_offset += count
+                    self.last_frametime = frame_time + self._pending_offset / self.sdStream.samplerate
+                    if self._pending_offset == len(samples):
+                        self._pending_audio = None
                 status.output_underflow=False
-                self.last_frametime=frame_time
             except queue.Empty:
-                print("\r empty", self.dataQueue, end="")
                 status.output_underflow=True
-                data.fill(0)
         elif self.state == "rec":
             try:
                 self.dataQueue.put_nowait(data)
