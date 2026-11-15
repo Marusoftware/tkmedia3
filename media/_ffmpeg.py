@@ -7,11 +7,18 @@ from queue import Full, Queue, Empty
 from .exception import MediaFileError
 from .lib import StopWatch
 
-def toImage(frame):
+def toImage(frame, bounds=None):
+    timestamp = frame.time
+    if bounds is not None:
+        width, height = bounds
+        ratio = min(width / frame.width, height / frame.height)
+        size = (max(1, int(frame.width * ratio)), max(1, int(frame.height * ratio)))
+        if size != (frame.width, frame.height):
+            frame = frame.reformat(width=size[0], height=size[1], format="rgb24")
     try:
-        return (frame.time, frame.to_image())
+        return (timestamp, frame.to_image())
     except:
-        return (frame.time, frame.to_rgb().to_image())
+        return (timestamp, frame.to_rgb().to_image())
 def toSdArray(frame, layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo"):
     # Normalize packed/planar and integer/float input, and downmix using the
     # channel layout so that center and surround audio reach stereo output.
@@ -89,8 +96,9 @@ class Stream():
                 "subtitles" : _stream_info(self.streams.subtitles),
                 "other" : _stream_info(self.streams.other)
             })
-            self.loader={"state":"stop", "thread":None, "queue_min":100, "queue_max":300, "audio":None, "video":None, "loaded":False, "audio_processor":[toSdArray], "video_processor":[toImage], "frame_size": 0}
+            self.loader={"state":"stop", "thread":None, "queue_min":100, "queue_max":300, "audio":None, "video":None, "loaded":False, "audio_processor":[toSdArray], "video_processor":[self._convert_video], "frame_size": 0}
             self.loader["audio_layout"] = "stereo"
+            self.loader["video_size"] = None
             self.loader["audio_processor"] = [self._convert_audio]
             self._loader_stop = threading.Event()
             self._buffer_ready = threading.Event()
@@ -100,11 +108,18 @@ class Stream():
             pass
     def _convert_audio(self, frame):
         return toSdArray(frame, layout=self.loader["audio_layout"])
+    def _convert_video(self, frame):
+        bounds = self.loader["video_size"]
+        if callable(bounds):
+            bounds = bounds()
+        return toImage(frame, bounds)
+
     def load(self, audio=None, video=None, queue_min=None, queue_max=None, block=True,
-             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo"):
+             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo", *, video_size=None):
         if audio is None and video is None:
             return
         self.loader["audio_layout"] = av.AudioLayout(audio_layout).name
+        self.loader["video_size"] = video_size
         if not queue_min is None:
             self.loader["queue_min"]=queue_min
         if not queue_max is None:
@@ -187,6 +202,13 @@ class Stream():
                         kind = "audio"
                     elif isinstance(frame, av.VideoFrame):
                         kind = "video"
+                        # Avoid spending image-conversion time on video the
+                        # renderer would discard. Leave 400 ms of the renderer's
+                        # lateness allowance for conversion and Tk drawing.
+                        if (self.loader["loaded"] and not self.stopwatch.isStop
+                                and frame.time is not None
+                                and self.stopwatch.getTime() - frame.time > 0.1):
+                            continue
                     else:
                         warnings.warn("Unknown frame type.", Warning)
                         continue

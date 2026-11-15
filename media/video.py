@@ -43,25 +43,27 @@ class Video():
         self._after_id=None
         if self.state=="play":
             try:
-                if self._pending_frame is None:
-                    self._pending_frame=self.ffmpeg._videoQ.get_nowait()
-                frame=self._pending_frame
+                while True:
+                    if self._pending_frame is None:
+                        self._pending_frame=self.ffmpeg._videoQ.get_nowait()
+                    frame=self._pending_frame
+                    gap=self.stopwatch.getTime()-frame[0]
+                    if gap <= 0.5:
+                        break
+                    # Drain stale queued frames in this callback rather than
+                    # scheduling a separate Tk callback for every discarded image.
+                    frame[1].close()
+                    self._pending_frame=None
             except Empty:
                 self._schedule(10)
             else:
                 info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loader["video"]]
                 sleep_time=1/info["fps"]
-                gap=self.stopwatch.getTime()-frame[0]
-                border=0.5
                 if gap<float(0):
                     # Keep this frame until its presentation time. Taking
                     # another frame here would drain all prefetched video.
                     self._schedule(max(1, ceil(-gap*1000)))
-                elif gap>float(border):
-                    frame[1].close()
-                    self._pending_frame=None
-                    self._schedule(0)
-                elif gap<=float(border):
+                else:
                     if not self.old_frame is None:
                         self.old_frame.close()
                         self.old_frame2=self.tkimage
@@ -70,7 +72,10 @@ class Video():
                         self.frame.configure(image=self.tkimage)
                     self.old_frame=frame[1]
                     self._pending_frame=None
-                    self._schedule(max(1, int(sleep_time*1000)))
+                    # Schedule against the media clock, so delayed callbacks
+                    # catch up instead of adding another frame interval.
+                    remaining = frame[0] + sleep_time - self.stopwatch.getTime()
+                    self._schedule(max(1, int(remaining * 1000)))
         elif self.state == "pause":
             pass
         elif self.state == "stop":

@@ -6,6 +6,7 @@ import threading
 import unittest
 from pathlib import Path
 from queue import Queue
+from unittest.mock import Mock
 
 from media._ffmpeg import Stream
 
@@ -131,6 +132,29 @@ class SeekTests(unittest.TestCase):
                 timestamps.append(queue.get_nowait()[0])
             self.assertTrue(timestamps)
             self.assertEqual(timestamps, sorted(timestamps))
+
+    def test_decoder_skips_late_video_before_image_conversion(self):
+        stream = Stream(str(self.path))
+        self.addCleanup(lambda: bounded_call(stream.close))
+        clock = Mock(isStop=False)
+        clock.getTime.return_value = 0
+        stream.stopwatch = clock
+        converted = []
+
+        def slow_conversion(frame):
+            converted.append(frame.time)
+            # Simulate a stall while rendering/decoding the first image.
+            clock.getTime.return_value = 4
+            return frame.time, None
+
+        stream.loader['video_processor'] = [slow_conversion]
+        bounded_call(lambda: stream.load(video=0, queue_min=1, queue_max=1000))
+        stream.loader['thread'].join(5)
+        self.assertFalse(stream.loader['thread'].is_alive())
+        self.assertIsNone(stream._loader_error)
+        self.assertEqual(converted[0], 0)
+        self.assertTrue(converted[1:])
+        self.assertTrue(all(timestamp >= 3.9 for timestamp in converted[1:]))
 
 
 if __name__ == "__main__":

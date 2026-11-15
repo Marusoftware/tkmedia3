@@ -68,8 +68,6 @@ class VideoTimingTests(unittest.TestCase):
         self.clock.getTime.return_value = 1
         self.widget.tick()
         late.close.assert_called_once()
-        self.assertEqual(next(iter(self.widget.callbacks.values()))[0], 0)
-        self.widget.tick()
         self.widget.configure.assert_called_once_with(image=current)
 
     def test_pause_retains_frame_and_resume_has_one_callback(self):
@@ -85,6 +83,29 @@ class VideoTimingTests(unittest.TestCase):
         self.clock.getTime.return_value = 1
         self.widget.tick()
         self.widget.configure.assert_called_once_with(image=image)
+
+    def test_late_display_does_not_wait_another_frame_interval(self):
+        image = Mock()
+        self.stream._videoQ.put((1, image))
+        self.clock.getTime.return_value = 1.2
+        self.widget.tick()
+        self.widget.configure.assert_called_once_with(image=image)
+        self.assertEqual(next(iter(self.widget.callbacks.values()))[0], 1)
+
+    def test_draw_time_is_included_in_next_presentation_deadline(self):
+        image = Mock()
+        self.stream._videoQ.put((1, image))
+        self.clock.getTime.return_value = 1
+
+        def slow_draw(image, **kwargs):
+            self.clock.getTime.return_value = 1.03
+            return image
+
+        with patch('media.video.ImageTk.PhotoImage', side_effect=slow_draw):
+            self.widget.tick()
+        delay = next(iter(self.widget.callbacks.values()))[0]
+        self.assertGreaterEqual(delay, 9)
+        self.assertLessEqual(delay, 10)
 
     def test_media_seek_discards_old_pending_frame_and_timer(self):
         old, new = Mock(), Mock()

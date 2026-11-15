@@ -27,7 +27,7 @@ class Media():
         self.status="pause"
     def play(self, audioDevice:Optional[int]=None, videoFrame:Optional[int]=None, video:Optional[int]=None,
              audio:Optional[int]=None, frame_type:Literal["label", "canvas"]="label",
-             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo"):
+             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo", *, video_size=None):
         """
         Play media.
         audioDevice(int): An number of Device(You can get with media.audio.getDevices func)
@@ -36,8 +36,17 @@ class Media():
         video(int): video stream number
         audio(int): audio stream number
         audio_layout(str): Output channel layout, e.g. 'mono', 'stereo', or '5.1'.
+        video_size: Optional (width, height) in pixels or a callable returning
+            the current bounds. The callable runs on the decoder thread and
+            must not access Tk widgets. The image fits inside the bounds.
         """
-        self.ffmpeg.load(audio=audio, video=video, block=True, audio_layout=audio_layout)
+        options = {}
+        if video_size is not None:
+            options["video_size"] = video_size
+            if audio is None and video is not None:
+                # Keep resized frames responsive to viewport changes.
+                options.update(queue_min=4, queue_max=8)
+        self.ffmpeg.load(audio=audio, video=video, block=True, audio_layout=audio_layout, **options)
         if not video is None:
             self.video=Video(self.ffmpeg, mode="w")
         if not audio is None:
@@ -46,7 +55,7 @@ class Media():
             self.audio.play(device=audioDevice)
         if not video is None:
             self.video.play(frame=videoFrame, frame_type=frame_type)
-        self.play_options={"audioDevice":audioDevice, "videoFrame":videoFrame, "video":video, "audio":audio, "frame_type":frame_type, "audio_layout":audio_layout}
+        self.play_options={"audioDevice":audioDevice, "videoFrame":videoFrame, "video":video, "audio":audio, "frame_type":frame_type, "audio_layout":audio_layout, "video_size":video_size}
         self.status="play"
     def pause(self):
         """
