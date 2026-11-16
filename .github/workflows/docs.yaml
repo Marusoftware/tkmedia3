@@ -14,11 +14,11 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
     steps:
       - uses: actions/checkout@v5
-      - name: Install PortAudio
+      - name: Install system dependencies
         run: |
-          if ! python3 -c 'from ctypes import CDLL; CDLL("libportaudio.so.2")' 2>/dev/null; then
+          if ! python3 -c 'import tkinter; from ctypes import CDLL; CDLL("libportaudio.so.2")' 2>/dev/null; then
             sudo -n apt-get update
-            sudo -n apt-get install -y libportaudio2
+            sudo -n apt-get install -y libportaudio2 python3-tk
           fi
       - name: Build
         id: build
