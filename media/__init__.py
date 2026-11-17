@@ -27,7 +27,8 @@ class Media():
         self.status="pause"
     def play(self, audioDevice:Optional[int]=None, videoFrame:Optional[int]=None, video:Optional[int]=None,
              audio:Optional[int]=None, frame_type:Literal["label", "canvas"]="label",
-             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo", *, video_size=None):
+             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo", *,
+             video_size=None, subtitle:Optional[int]=None, subtitle_file=None):
         """
         Play media.
         audioDevice(int): An number of Device(You can get with media.audio.getDevices func)
@@ -39,8 +40,17 @@ class Media():
         video_size: Optional (width, height) in pixels or a callable returning
             the current bounds. The callable runs on the decoder thread and
             must not access Tk widgets. The image fits inside the bounds.
+        subtitle(int): Zero-based index of an embedded text subtitle track.
+        subtitle_file: Path to an external text subtitle file, such as SRT.
+            Select at most one subtitle source. Subtitles require video output.
         """
         options = {}
+        if subtitle is not None or subtitle_file is not None:
+            if video is None or videoFrame is None:
+                raise ValueError("Subtitles require a video stream and videoFrame.")
+            options.update(subtitle=subtitle, subtitle_file=subtitle_file)
+        if video is not None and (videoFrame is None or frame_type not in ("label", "canvas")):
+            raise ValueError("Video requires a videoFrame with frame_type 'label' or 'canvas'.")
         if video_size is not None:
             options["video_size"] = video_size
             if audio is None and video is not None:
@@ -55,7 +65,7 @@ class Media():
             self.audio.play(device=audioDevice)
         if not video is None:
             self.video.play(frame=videoFrame, frame_type=frame_type)
-        self.play_options={"audioDevice":audioDevice, "videoFrame":videoFrame, "video":video, "audio":audio, "frame_type":frame_type, "audio_layout":audio_layout, "video_size":video_size}
+        self.play_options={"audioDevice":audioDevice, "videoFrame":videoFrame, "video":video, "audio":audio, "frame_type":frame_type, "audio_layout":audio_layout, "video_size":video_size, "subtitle":subtitle, "subtitle_file":subtitle_file}
         self.status="play"
     def pause(self):
         """

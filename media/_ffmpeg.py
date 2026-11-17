@@ -3,16 +3,17 @@ import av
 import av, threading, time, numpy, warnings
 from av.filter import Graph, filters_available
 from av.audio.fifo import AudioFifo 
-from queue import Full, Queue, Empty
+from queue import Full, Queue, Empty, SimpleQueue
+from ._ass import styled_header
 from .exception import MediaFileError
 from .lib import StopWatch
+from .picture import _fit_size
+from .subtitle import decode_cues, read_subtitle_file, validate_text_stream
 
 def toImage(frame, bounds=None):
     timestamp = frame.time
     if bounds is not None:
-        width, height = bounds
-        ratio = min(width / frame.width, height / frame.height)
-        size = (max(1, int(frame.width * ratio)), max(1, int(frame.height * ratio)))
+        size = _fit_size((frame.width, frame.height), bounds)
         if size != (frame.width, frame.height):
             frame = frame.reformat(width=size[0], height=size[1], format="rgb24")
     try:
@@ -78,6 +79,12 @@ class Stream():
             self.info.update(start_time=self.ffmpeg.start_time)
             def _stream_info(streams):
                 def toDict(st):
+                    if st.type == "subtitle":
+                        codec = st.codec_context.codec
+                        return {"duration": st.duration, "id": st.id, "index": st.index,
+                                "lang": st.language, "meta": st.metadata,
+                                "codec_name": codec.name, "codec_long": codec.long_name,
+                                "time_base": st.time_base, "start_time": st.start_time}
                     if st.type == "video" or st.type == "audio":
                         codec=st.codec_context
                         o = {"duration":st.duration, "id":st.id, "index":st.index, "lang":st.language, "meta":st.metadata,
@@ -104,6 +111,10 @@ class Stream():
             self._buffer_ready = threading.Event()
             self._loader_error = None
             self._seek_point = None
+            self._subtitle_stream = None
+            self._subtitleQ = None
+            self._ass_header = None
+            self._external_cues = ()
         elif mode == "w":
             pass
     def _convert_audio(self, frame):
@@ -115,10 +126,34 @@ class Stream():
         return toImage(frame, bounds)
 
     def load(self, audio=None, video=None, queue_min=None, queue_max=None, block=True,
-             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo", *, video_size=None):
+             audio_layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo", *,
+             video_size=None, subtitle=None, subtitle_file=None):
         if audio is None and video is None:
             return
-        self.loader["audio_layout"] = av.AudioLayout(audio_layout).name
+        if subtitle is not None and subtitle_file is not None:
+            raise ValueError("Select either a subtitle stream or a subtitle file.")
+        selected = {}
+        for kind, index, streams in (("audio", audio, self.streams.audio),
+                                     ("video", video, self.streams.video),
+                                     ("subtitle", subtitle, self.streams.subtitles)):
+            if index is not None:
+                first_index = 0 if kind == "subtitle" else -len(streams)
+                if not first_index <= index < len(streams):
+                    raise MediaFileError(f"{kind.capitalize()} stream '{index}' does not exist.")
+                selected[kind] = streams[index]
+        subtitle_stream = selected.get("subtitle")
+        if subtitle_stream is not None:
+            validate_text_stream(subtitle_stream)
+        header, external_cues = None, ()
+        if subtitle_file is not None:
+            header, external_cues = read_subtitle_file(subtitle_file)
+        elif subtitle_stream is not None:
+            header = styled_header(subtitle_stream)
+        layout = av.AudioLayout(audio_layout).name
+        if "generator" in self.loader:
+            self.stop()
+            self.clear()
+        self.loader["audio_layout"] = layout
         self.loader["video_size"] = video_size
         if not queue_min is None:
             self.loader["queue_min"]=queue_min
@@ -126,30 +161,20 @@ class Stream():
             self.loader["queue_max"]=queue_max
         self.loader["audio"]=audio
         self.loader["video"]=video
-        mux_source=[]
+        self._seek_point = None
+        self._selected_streams = tuple(selected.values())
+        self._subtitle_stream = subtitle_stream
+        self._ass_header = header
+        self._external_cues = external_cues
+        self._subtitleQ = SimpleQueue() if subtitle is not None or subtitle_file is not None else None
+        self._queue_external_cues(0)
         if not audio is None:
-            if len(self.info["streams"]["audio"]) == 0:
-                raise MediaFileError("This File doesn't contain audio.")
-            if len(self.info["streams"]["audio"]) < audio:
-                raise MediaFileError(f"Audio stream '{audio}' is not exists.")
             self._audioPreQ=AudioFifo()
             self._audioQ=Queue(maxsize=self.loader["queue_max"])
             self.loader["frame_size"]=self.info["streams"]["audio"][audio]["frame_size"]
-            mux_source.append(self.streams.get(audio=audio))
         if not video is None:
-            if len(self.info["streams"]["video"]) == 0:
-                raise MediaFileError("This File doesn't contain video.")
-            if len(self.info["streams"]["video"]) < video:
-                raise MediaFileError(f"Video stream '{video}' is not exists.")
             self._videoQ=Queue(maxsize=self.loader["queue_max"])
-            mux_source.append(self.streams.get(video=video))
-        if not audio is None and not video is None:
-            self.loader["generator"]=self.ffmpeg.demux(audio=audio, video=video)
-        elif not audio is None:
-            self.loader["generator"]=self.ffmpeg.decode(mux_source[0])
-        elif not video is None:
-            self.loader["generator"]=self.ffmpeg.decode(mux_source[0])
-        del mux_source
+        self.loader["generator"] = self.ffmpeg.demux(*self._selected_streams)
         self._start_loader()
         if block:
             self._wait_loaded()
@@ -179,6 +204,11 @@ class Stream():
             self._buffer_ready.set()
     def _loader(self):
         try:
+            if self._seek_point is not None and self._subtitle_stream is not None:
+                self._load_active_cues(self._seek_point)
+                if self._loader_stop.is_set():
+                    return
+                self._seek_demux(self._seek_point)
             generator = self.loader["generator"]
             while not self._loader_stop.is_set():
                 if (self.loader["state"] == "pause"
@@ -189,8 +219,12 @@ class Stream():
                     item = next(generator)
                 except StopIteration:
                     break
-                frames = item.decode() if isinstance(item, av.Packet) else [item]
-                for frame in frames:
+                if item.stream.type == "subtitle":
+                    for cue in decode_cues(item, bool(self._ass_header)):
+                        if self._seek_point is None or cue[0] > self._seek_point:
+                            self._subtitleQ.put(cue)
+                    continue
+                for frame in item.decode():
                     if self._loader_stop.is_set():
                         return
                     # Seeking lands on a preceding keyframe. Decode from it,
@@ -236,35 +270,54 @@ class Stream():
         # while we seek or clear its queues.
         self.stop()
         self.clear()
-        self.ffmpeg.seek(int(point * av.time_base))
-        if self.loader["audio"] is not None and self.loader["video"] is not None:
-            self.loader["generator"]=self.ffmpeg.demux(audio=self.loader["audio"], video=self.loader["video"])
-        elif self.loader["audio"] is not None:
-            self.loader["generator"]=self.ffmpeg.decode(audio=self.loader["audio"])
-        elif self.loader["video"] is not None:
-            self.loader["generator"]=self.ffmpeg.decode(video=self.loader["video"])
+        if self._subtitle_stream is None:
+            self._seek_demux(point)
+        self._queue_external_cues(point)
         self._seek_point = point
         self.stopwatch.setTime(point)
         self._start_loader()
         if block:
             self._wait_loaded()
         self.stopwatch.start()
+
+    def _seek_demux(self, point):
+        self.ffmpeg.seek(int(point * av.time_base))
+        self.loader["generator"] = self.ffmpeg.demux(*self._selected_streams)
+
+    def _queue_external_cues(self, point):
+        for cue in self._external_cues:
+            if cue[1] > point:
+                self._subtitleQ.put(cue)
+
+    def _load_active_cues(self, point):
+        # A subtitle can start before the keyframe used for the video seek.
+        # Read only subtitle packets up to the target to restore overlapping cues.
+        self.ffmpeg.seek(min(0, self.ffmpeg.start_time or 0))
+        packets = self.ffmpeg.demux(self._subtitle_stream)
+        try:
+            for packet in packets:
+                if self._loader_stop.is_set():
+                    break
+                if packet.pts is not None and float(packet.pts * packet.time_base) > point:
+                    break
+                for cue in decode_cues(packet, bool(self._ass_header)):
+                    if cue[1] > point:
+                        self._subtitleQ.put(cue)
+        finally:
+            packets.close()
+
     def clear(self):
         generator = self.loader.pop("generator", None)
         if generator is not None:
             generator.close()
         if hasattr(self, "_audioPreQ"):
             self._audioPreQ = AudioFifo()
-        if hasattr(self, "_audioQ"):
-            while 1:
+        for queue in (*self._queues(), self._subtitleQ):
+            if queue is None:
+                continue
+            while True:
                 try:
-                    self._audioQ.get_nowait()
-                except Empty:
-                    break
-        if hasattr(self, "_videoQ"):
-            while 1:
-                try:
-                    self._videoQ.get_nowait()
+                    queue.get_nowait()
                 except Empty:
                     break
     def pause(self):

@@ -3,6 +3,9 @@ from PIL import ImageTk
 from queue import Empty
 from math import ceil
 from tkinter import TclError
+from ._ass import AssOverlay
+from .picture import _set_widget_image
+from .subtitle import SubtitleOverlay
 
 class Video():
     def __init__(self, stream, mode="w"):
@@ -16,10 +19,23 @@ class Video():
         self.tkimage=None
         self._pending_frame=None
         self._after_id=None
+        self._canvas_item = None
+        self._subtitles = None
+        self._ass = None
     def play(self, frame, frame_type):
         if not self.ffmpeg.loader["loaded"]: raise WrongOrderError("Stream is not loaded.")
+        if frame_type not in ("label", "canvas"):
+            raise ValueError("frame_type must be 'label' or 'canvas'")
+        if self.played:
+            self.close()
         self.frame=frame
         self.frame_type=frame_type
+        subtitle_queue = getattr(self.ffmpeg, "_subtitleQ", None)
+        if subtitle_queue is not None:
+            if self.ffmpeg._ass_header is not None:
+                self._ass = AssOverlay(self.ffmpeg._ass_header, subtitle_queue)
+            else:
+                self._subtitles = SubtitleOverlay(frame, subtitle_queue)
         self.state="play"
         self._schedule(0)
         self.played=True
@@ -32,17 +48,49 @@ class Video():
             self._after_id=None
     def _schedule(self, milliseconds):
         self._cancel()
+        if self._subtitles is not None or self._ass is not None:
+            milliseconds = min(milliseconds, 20)
         self._after_id=self.frame.after(milliseconds, self._play)
     def reset(self):
         """Discard the pending frame and callback when the timeline changes."""
         self._cancel()
+        if self._subtitles is not None:
+            self._subtitles.reset()
+        if self._ass is not None:
+            had_overlay = self._ass.image is not None
+            self._ass.reset()
+            if had_overlay and self.old_frame is not None:
+                try:
+                    self._draw_frame(self.old_frame)
+                except TclError:
+                    pass  # The widget may already have been destroyed.
         if self._pending_frame is not None:
             self._pending_frame[1].close()
             self._pending_frame=None
+
+    def _draw_frame(self, image):
+        self.old_frame2 = self.tkimage
+        overlay = self._ass.image if self._ass is not None else None
+        if overlay is not None:
+            with image.copy() as composed:
+                composed.paste(overlay, mask=overlay.getchannel("A"))
+                self.tkimage = ImageTk.PhotoImage(composed, master=self.frame)
+        else:
+            self.tkimage = ImageTk.PhotoImage(image, master=self.frame)
+        self._canvas_item = _set_widget_image(
+            self.frame, self.frame_type, self.tkimage, self._canvas_item)
+
+    def _refresh_ass(self):
+        if self._ass is not None and self.old_frame is not None:
+            if self._ass.update(self.stopwatch.getTime(), self.old_frame.size):
+                self._draw_frame(self.old_frame)
+
     def _play(self):
         self._after_id=None
         if self.state=="play":
             try:
+                if self._subtitles is not None:
+                    self._subtitles.update(self.stopwatch.getTime())
                 while True:
                     if self._pending_frame is None:
                         self._pending_frame=self.ffmpeg._videoQ.get_nowait()
@@ -55,6 +103,7 @@ class Video():
                     frame[1].close()
                     self._pending_frame=None
             except Empty:
+                self._refresh_ass()
                 self._schedule(10)
             else:
                 info=self.ffmpeg.info["streams"]["video"][self.ffmpeg.loader["video"]]
@@ -62,24 +111,20 @@ class Video():
                 if gap<float(0):
                     # Keep this frame until its presentation time. Taking
                     # another frame here would drain all prefetched video.
+                    self._refresh_ass()
                     self._schedule(max(1, ceil(-gap*1000)))
                 else:
                     if not self.old_frame is None:
                         self.old_frame.close()
-                        self.old_frame2=self.tkimage
-                    self.tkimage=ImageTk.PhotoImage(frame[1], master=self.frame)
-                    if self.frame_type=="label":
-                        self.frame.configure(image=self.tkimage)
+                    if self._ass is not None:
+                        self._ass.update(self.stopwatch.getTime(), frame[1].size)
+                    self._draw_frame(frame[1])
                     self.old_frame=frame[1]
                     self._pending_frame=None
                     # Schedule against the media clock, so delayed callbacks
                     # catch up instead of adding another frame interval.
                     remaining = frame[0] + sleep_time - self.stopwatch.getTime()
                     self._schedule(max(1, int(remaining * 1000)))
-        elif self.state == "pause":
-            pass
-        elif self.state == "stop":
-            pass
     def pause(self):
         self.state = "pause"
         self._cancel()
@@ -91,3 +136,15 @@ class Video():
         self.reset()
     def close(self):
         self.stop()
+        if self._ass is not None:
+            self._ass.close()
+            self._ass = None
+        if self._subtitles is not None:
+            self._subtitles.close()
+            self._subtitles = None
+        if self._canvas_item is not None:
+            try:
+                self.frame.delete(self._canvas_item)
+            except TclError:
+                pass
+            self._canvas_item = None
