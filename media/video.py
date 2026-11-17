@@ -1,3 +1,8 @@
+"""Lower-level video output for an already loaded stream.
+
+Applications normally use `media.Media.play` to construct this renderer.
+"""
+
 from .exception import WrongOrderError
 from PIL import ImageTk
 from queue import Empty
@@ -8,7 +13,16 @@ from .picture import _set_widget_image
 from .subtitle import SubtitleOverlay
 
 class Video():
+    """Present buffered video frames using the shared playback clock.
+
+    Use `media.Media` for source loading and coordinated playback.
+    """
     def __init__(self, stream, mode="w"):
+        """Attach to a loaded stream and its playback clock.
+
+        `stream` is the internal stream owned by a Media instance. The supported
+        output mode is `"w"`.
+        """
         self.ffmpeg = stream
         self.mode=mode
         self.played=False
@@ -23,6 +37,11 @@ class Video():
         self._subtitles = None
         self._ass = None
     def play(self, frame, frame_type):
+        """Schedule drawing in `frame`, a Tkinter Label or Canvas.
+
+        `frame_type` is `"label"` or `"canvas"`. The stream must already
+        be loaded. Call on the Tkinter thread and run its main loop.
+        """
         if not self.ffmpeg.loader["loaded"]: raise WrongOrderError("Stream is not loaded.")
         if frame_type not in ("label", "canvas"):
             raise ValueError("frame_type must be 'label' or 'canvas'")
@@ -126,15 +145,19 @@ class Video():
                     remaining = frame[0] + sleep_time - self.stopwatch.getTime()
                     self._schedule(max(1, int(remaining * 1000)))
     def pause(self):
+        """Cancel scheduled drawing while retaining the current image."""
         self.state = "pause"
         self._cancel()
     def resume(self):
+        """Schedule drawing again using the shared playback clock."""
         self.state = "play"
         self._schedule(0)
     def stop(self):
+        """Cancel drawing and discard the pending frame and subtitles."""
         self.state="stop"
         self.reset()
     def close(self):
+        """Stop drawing and release subtitle renderers and the Canvas item."""
         self.stop()
         if self._ass is not None:
             self._ass.close()

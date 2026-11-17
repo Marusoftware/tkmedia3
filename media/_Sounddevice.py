@@ -3,10 +3,25 @@ from .exception import ModeError, WrongOrderError
 from .lib import StopWatch
 
 def getDevices(device=None, kind=None):
+    """Query sounddevice devices.
+
+    - `device` — Device index or name to query, or `None` to list devices.
+    - `kind` — `"input"`, `"output"`, or `None`.
+
+    The result is converted to a list. With default arguments it contains
+    device dictionaries in device-index order. A single-device query returns
+    a list of that device dictionary's keys. See sounddevice.query_devices
+    for device fields and selection rules.
+    """
     return list(sounddevice.query_devices(device=device, kind=kind))
 def getVersion():
+    """Return the PortAudio version number and descriptive version string."""
     return sounddevice.get_portaudio_version()
 def getHostApi(index=None):
+    """Return sounddevice host API information.
+
+    `index=None` lists all host APIs; an integer selects one API.
+    """
     return sounddevice.query_hostapis(index=index)
 
 class Sounddevice():

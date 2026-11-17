@@ -1,3 +1,5 @@
+"""Still-image display for Tkinter. The main entry point is `media.Picture`."""
+
 from tkinter import TclError
 from typing import Literal
 
@@ -21,9 +23,18 @@ def _set_widget_image(frame, frame_type, image, canvas_item=None):
 
 
 class Picture:
-    """Display a still image from a path, a binary file, or a Pillow image."""
+    """Display a still image in one Tkinter Label or Canvas.
+
+    The source is copied and EXIF orientation is applied. Keep the instance
+    alive while its image is visible. All display methods run on the Tkinter thread.
+    """
 
     def __init__(self, source):
+        """Load a path, binary file object, or Pillow image.
+
+        The caller retains ownership of a supplied file object or Pillow image.
+        Animated sources use their initially selected frame.
+        """
         if isinstance(source, Image.Image):
             self._image = ImageOps.exif_transpose(source)
         else:
@@ -35,7 +46,17 @@ class Picture:
         self._photo = None
 
     def show(self, frame, frame_type: Literal["label", "canvas"] = "label", *, size=None):
-        """Display the image, optionally fitting it within (width, height)."""
+        """Display or update the image in a Tkinter widget.
+
+        - `frame` — Destination Tkinter Label or Canvas.
+        - `frame_type` — `"label"` (default) or `"canvas"`.
+        - `size` — Optional positive (width, height) pixel bounds. Aspect ratio
+          is preserved when enlarging or shrinking.
+
+        Canvas output uses the northwest anchor at (0, 0). Calling again reuses
+        the Canvas item or moves the picture to the newly supplied widget.
+        Invalid frame types, nonpositive bounds, or a closed picture raise `ValueError`.
+        """
         if frame_type not in ("label", "canvas"):
             raise ValueError("frame_type must be 'label' or 'canvas'")
         if self._image is None:
@@ -56,7 +77,10 @@ class Picture:
         self._photo = photo
 
     def hide(self):
-        """Remove the displayed image and keep it available to show again."""
+        """Remove the image from its current widget.
+
+        The source image stays loaded and can be displayed again with `show()`.
+        """
         if self._widget is not None:
             try:
                 if self._canvas_item is not None:
@@ -70,7 +94,10 @@ class Picture:
         self._photo = None
 
     def close(self):
-        """Remove the display and release the source image."""
+        """Remove the display and release the loaded image.
+
+        Calling again is safe. To display a new image, create a new Picture.
+        """
         self.hide()
         if self._image is not None:
             self._image.close()

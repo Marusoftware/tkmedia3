@@ -29,6 +29,11 @@ def toSdArray(frame, layout:Literal["mono", "stereo", "5.1", "7.1"]="stereo"):
     return (frame.time, converted.to_ndarray().reshape(-1, channels).copy(order='C'))
 
 class AudioFilter():
+    """Experimental PyAV audio filter wrapper.
+
+    This API is unfinished. `getFilter()` has no implementation and
+    `addFilter()` supports only the current direct source-to-sink setup.
+    """
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):
         self.filter=Graph()
         self.src=self.filter.add_abuffer(template=stream, width=width, height=height, format=format, name=name)
@@ -46,6 +51,11 @@ class AudioFilter():
         return filters_available
 
 class VideoFilter():
+    """Experimental PyAV video filter wrapper.
+
+    This API is unfinished. `getFilter()` has no implementation and
+    `addFilter()` supports only the current direct source-to-sink setup.
+    """
     def __init__(self, stream=None, width=None, height=None, format=None, name=None):
         self.filter=Graph()
         self.src=self.filter.add_buffer(template=stream, width=width, height=height, format=format, name=name)
